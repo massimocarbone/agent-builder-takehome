@@ -138,6 +138,48 @@ scheduling conflicts, high-value or complex reservations, payment issues, and "a
 where the right outcome is unclear" as representative-handled. Where published policy and
 our design agree, the design cites it.
 
+### Retrieval: lexical + authority ranking, not embeddings
+
+Scoring is term overlap weighted toward `title` and `category`, multiplied by an authority
+weight (`official-policy` 1.0, `help-center` 0.7, `legacy` 0.25), with `last_updated` as
+the tiebreak. When a `legacy` article and a higher-authority article both match within the
+same category, the legacy one is suppressed rather than shown alongside — the model never
+has to adjudicate a conflict it can't see the provenance of. Below a score floor, the
+agent says it has no policy on the question and offers a human rather than improvising.
+
+**Why not embeddings.** Recall is not the failure mode at this corpus size — 30 articles
+across 7 categories, with titles written in customer vocabulary, are reliably found by
+lexical matching. The failure mode that actually costs something is retrieving the
+*wrong-authority* article and quoting a grace period that is wrong by 90 minutes. Lexical
+scoring also stays deterministic, which turns that trap into a regression test: assert
+that "grace period" returns `kb_ext_01` and never `kb_fee_01`. That assertion is much
+harder to write against embedding similarity. Embeddings are the documented scale-up path
+for a 3,000-article corpus, not this one.
+
+### Retrieval provenance is a product feature, not just a debug aid
+
+Every retrieval logs the article IDs it returned, their authority, and their
+`last_updated`, alongside the answer that was given. That trail exists first so a wrong
+answer can be traced to a specific article after the fact.
+
+But it also inverts into something more valuable to Avis: **the agent becomes an
+instrument for finding stale documentation.** If customer complaints, escalations, or
+corrections cluster around a particular article ID, that article is the problem — and the
+log says so directly, with a citation. A help centre of any size has no other cheap signal
+for which of its pages have quietly gone out of date; here it falls out of normal
+operation. The `legacy` grace-period article is the worked example: it is exactly the kind
+of page that would surface at the top of that report on day one.
+
+### What the knowledge base is *not* allowed to do
+
+Retrieval answers policy questions in prose. It never supplies a number that drives money.
+
+The moment a retrieved article becomes the source of a dollar figure, the model is reading
+"a penalty equal to one day's rate" and doing arithmetic against `daily_rate` — the exact
+LLM-touching-money pattern the rest of the architecture exists to prevent. Instead a
+deterministic policy function computes the figure, and the article is attached as the
+*citation* justifying it. Code can be unit-tested; a paraphrase cannot.
+
 ---
 
 ## 3. Cross-cutting design rules
@@ -205,6 +247,91 @@ Cancel. The position taken here:
   cancellation) **once**, accept a "no" immediately, and never gate the cancellation on it.
   A retention attempt that becomes an obstacle is precisely how these agents destroy trust,
   and the brief names trust as a hard constraint.
+
+### "Cancel" is ambiguous mid-rental — read state before believing the verb
+
+**The finding.** The knowledge base and the API disagree about what cancellation *is*.
+`kb_can_01` says reservations are cancelled "before the rental begins," and `kb_can_04`
+says explicitly that returning a car early is **not** a cancellation. But every reservation
+in the test set has `status: active` — the customer physically holds the vehicle — and the
+API cancels them regardless, charging a penalty of one day's rate.
+
+**Verified against the API:** shortening a rental is impossible. `modify` with an earlier
+`new_return_datetime` returns `400 INVALID_CHANGE` ("does not extend the rental or change
+location"), while the same call with a later datetime succeeds. There is no early-return
+endpoint. Early return happens physically, at the counter, outside this API entirely.
+
+**So the two real outcomes for a customer holding a car diverge on money:**
+
+| | Cancel via API | Physically return early |
+|---|---|---|
+| Fee | Penalty = one day's rate | No fee (`kb_can_04`) |
+| Refund | Prepaid − penalty | Based on time actually rented; some rate plans refund nothing |
+| Vehicle | Still in their possession, now with no reservation | Returned |
+| API action | `POST /cancel` | None exists |
+
+Which is cheaper depends on the rate plan and how much of the rental has elapsed. **The
+agent must not choose on the customer's behalf.** A customer who says "cancel" but means
+"I'm done, I'll bring it back" would be charged a one-day penalty for a word choice — a
+trust failure invisible to anyone not looking for it.
+
+### Cancel decision tree
+
+Branch on live reservation state, never on the customer's verb.
+
+```
+"cancel" intent
+│
+├─ 1. Look up reservation FIRST. Read status, pickup_datetime, current_return_datetime.
+│
+├─ 2. status != active
+│     → API returns 409 RESERVATION_NOT_ACTIVE. Already cancelled, or completed.
+│       Explain; do not retry. Escalate if the customer disputes it.
+│
+├─ 3. pickup_datetime is in the FUTURE  →  a true cancellation
+│     ├─ >48h before pickup   → estimate: no penalty, full refund of prepaid
+│     └─ ≤48h before pickup   → estimate: penalty = one day's rate
+│     → estimate (labelled) → confirm → cancel → compare actual to estimate
+│       → material variance escalates (§3 handoff rules)
+│
+└─ 4. pickup_datetime is in the PAST  →  customer has the car. Do NOT assume cancel.
+      Disambiguate before acting:
+      ├─ "I'll bring it back early / I'm done with it"
+      │     → early return. NO API action. Tell them to return it; charges follow
+      │       actual rental time, no fee. Cancelling here would ADD a one-day penalty
+      │       and leave them holding an unreserved vehicle.
+      ├─ "Cancel the whole thing, I don't want to be charged"
+      │     → explain what cancel actually does: penalty of one day's rate, refund of
+      │       the remainder, AND the vehicle must still be returned. Show the money.
+      │       Explicit confirmation, then cancel.
+      └─ ambiguous, disputing charges, or overdue beyond policy
+            → escalate (kb_elig_01: overdue reservations may require a representative)
+```
+
+### Situations the test data does not cover
+
+All six test reservations are `active`, prepaid, and past their return date, which means
+they exercise exactly one branch of the policy. Everything below is designed for but
+unobserved — reviewers will test on reservations we haven't seen:
+
+- **Pre-pickup cancellation, >48h out.** The full-refund/no-penalty branch has never been
+  observed. Implemented from `kb_can_01`, labelled as an estimate.
+- **Pre-pickup cancellation, ≤48h out.** Same formula as observed, different trigger.
+- **Non-refundable prepaid rates.** `kb_can_01` names them as an exception — and the
+  reservation payload exposes **no rate-plan field**, so the agent cannot detect one. This
+  alone is sufficient reason the pre-confirmation figure is always an estimate.
+- **Pay-at-counter with no prepayment.** `kb_can_02` says there is simply nothing to
+  refund. All six test reservations carry a `total_charged`, so this is unobserved.
+- **No-show** (`kb_can_03`) — pickup time passed, vehicle never collected.
+- **Already-cancelled / completed rentals** → `409`. Unreachable in testing because writes
+  are ephemeral and never persist.
+- **"Cancel" meaning a different, future reservation** the customer also holds.
+
+**Penalty formula, verified.** Across all six reservations the API returned
+`penalty == daily_rate` exactly, and `refund == prepaid − penalty`, matching `kb_can_01`.
+That makes the deterministic estimator accurate for the observed branch — and the
+unobserved branches above are precisely why it stays an estimate with a variance
+escalation behind it.
 
 ### Graceful out-of-scope decline
 
@@ -390,6 +517,16 @@ logs are written.
 
 ## 8. Changelog
 
+- **2026-08-05** — Knowledge-base and cancel design settled ahead of building either.
+  Retrieval will be lexical with authority/recency ranking rather than embeddings, and
+  will never source a number that drives money — a deterministic policy function computes
+  figures, the article is attached as citation. Retrieval provenance doubles as a stale-KB
+  detector for Avis. Probed the API on cancel semantics and found that shortening a rental
+  is rejected (`INVALID_CHANGE`) while lengthening succeeds, so no early-return path
+  exists; "cancel" on an active rental therefore diverges from what most customers mean by
+  it, and now branches on live reservation state rather than the customer's verb. Verified
+  the penalty formula (`penalty == daily_rate`, `refund == prepaid − penalty`) across all
+  six reservations, and catalogued the policy branches the test data cannot exercise.
 - **2026-08-05** — `feat/extend` verified end-to-end and merged. Four scripted
   conversations against the live API and model: happy path, a customer demanding "don't
   quote me, just charge it" (refused, quoted anyway, nothing charged), out-of-scope
