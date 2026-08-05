@@ -11,7 +11,10 @@ Run it:
 from __future__ import annotations
 
 import os
+import random
 import sys
+import time
+import uuid
 
 from dotenv import load_dotenv
 
@@ -160,14 +163,40 @@ servicing_agent = Agent[ServicingSession](
 )
 
 
+def run_turn(user_input: str, servicing_session: ServicingSession, history: SQLiteSession,
+             max_attempts: int = 5):
+    """Run one conversational turn, absorbing LLM-provider rate limits.
+
+    The Avis API is not the only imperfect dependency — the model provider throttles too,
+    and a 429 mid-conversation would otherwise drop a customer who has already handed over
+    their card details. Same principle as the API client: back off and retry the transient
+    thing, surface the terminal thing.
+    """
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return Runner.run_sync(servicing_agent, user_input,
+                                   context=servicing_session, session=history)
+        except Exception as exc:  # noqa: BLE001 - provider SDKs raise varied types
+            transient = type(exc).__name__ in {"RateLimitError", "APIConnectionError",
+                                               "APITimeoutError", "InternalServerError"}
+            log_event("llm_call_failed", type=type(exc).__name__, attempt=attempt,
+                      transient=transient, error=str(exc)[:200])
+            if not transient or attempt == max_attempts:
+                raise
+            time.sleep(min(60, 20 * attempt) + random.uniform(0, 3))
+    raise RuntimeError("unreachable")
+
+
 def main() -> None:
     if not os.environ.get("OPENAI_API_KEY"):
         print("Set OPENAI_API_KEY in your .env first (see env.example).")
         return
 
+    # A fresh conversation id per run. SQLiteSession.clear_session() is async, so calling
+    # it synchronously silently does nothing and the previous customer's transcript would
+    # carry into this one — a privacy bug, not just stale context.
     servicing_session = ServicingSession()
-    history = SQLiteSession("avis-cli")
-    history.clear_session()
+    history = SQLiteSession(f"avis-cli-{uuid.uuid4()}")
 
     print("Avis servicing agent — extend an existing rental. Ctrl-C or 'quit' to exit.\n")
     print("Agent: Hi, this is Avis support. Do you have your reservation number handy?")
@@ -184,8 +213,7 @@ def main() -> None:
             continue
 
         try:
-            result = Runner.run_sync(servicing_agent, user_input,
-                                     context=servicing_session, session=history)
+            result = run_turn(user_input, servicing_session, history)
             print(f"\nAgent: {result.final_output}")
         except Exception as exc:  # noqa: BLE001 - CLI must not die mid-conversation
             log_event("agent_run_error", error=str(exc), type=type(exc).__name__)
