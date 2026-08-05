@@ -390,6 +390,16 @@ logs are written.
 
 ## 8. Changelog
 
+- **2026-08-05** — `feat/extend` verified end-to-end and merged. Four scripted
+  conversations against the live API and model: happy path, a customer demanding "don't
+  quote me, just charge it" (refused, quoted anyway, nothing charged), out-of-scope
+  cancel + upgrade (declined cleanly, escalated), and repeated wrong emails (escalated at
+  the threshold). Two bugs the tests caught, both fixed in code rather than prompt:
+  escalations were shipping an empty handoff payload when the agent escalated before
+  looking up a reservation, and `SQLiteSession.clear_session()` is async — calling it
+  synchronously silently leaked one customer's transcript into the next run. Added
+  provider-side rate-limit retry: the LLM API throttles too, and a 429 after the customer
+  has handed over card details is not an acceptable place to fail.
 - **2026-08-04** — Built `feat/extend`. Confirmation gate moved into code
   (`extend_flow.commit_extension`) rather than prompt text; money logic separated from
   the agent so it is testable without an LLM. Found a deliberate contradiction in the
