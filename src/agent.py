@@ -26,6 +26,7 @@ from agents import Agent, RunContextWrapper, Runner, SQLiteSession, function_too
 
 import config  # noqa: E402
 import extend_flow  # noqa: E402
+import kb  # noqa: E402
 from avis_client import AvisAPIError, get_reservation  # noqa: E402
 from session import ServicingSession, log_event  # noqa: E402
 
@@ -99,6 +100,23 @@ def confirm_extension(ctx: RunContextWrapper[ServicingSession], email: str, cvv:
 
 
 @function_tool
+def search_policy(query: str) -> dict:
+    """Search Avis policy articles for questions about rules, fees, grace periods,
+    refund timing, membership benefits, and similar. Returns the most relevant articles
+    with their authority level and last-updated date.
+
+    Use this for any policy question instead of answering from memory. If it returns no
+    articles, say you don't have policy on that and offer a representative — do not
+    guess. Never use an article to compute a price; prices come from quote tools only.
+    """
+    results = kb.search(query)
+    if not results:
+        return {"ok": True, "articles": [],
+                "note": "No policy found. Say so and offer a representative; do not improvise."}
+    return {"ok": True, "articles": results}
+
+
+@function_tool
 def escalate_to_human(ctx: RunContextWrapper[ServicingSession], reason: str,
                       customer_intent: str, reservation_id: str = "") -> dict:
     """Hand off to a human agent, passing along everything collected so far.
@@ -167,6 +185,10 @@ Rules you do not bend:
 - When a tool returns escalate: true, stop working the request and hand off.
 - Never invent prices, fees, policies, or confirmation numbers. Every number you say must
   come from a tool result.
+- For policy questions (grace periods, fees, refund timing, membership benefits), use
+  search_policy and answer from what it returns. If it returns nothing, say you don't
+  have that policy on hand and offer a representative. Policy articles explain rules;
+  they are never a source for the price of this customer's change — only quotes are.
 
 Be warm and brief. This is a phone-style conversation, not a form.
 """
@@ -175,7 +197,8 @@ servicing_agent = Agent[ServicingSession](
     name="Avis Extend Specialist",
     model=config.AGENT_MODEL,
     instructions=INSTRUCTIONS,
-    tools=[lookup_reservation, quote_extension, confirm_extension, escalate_to_human],
+    tools=[lookup_reservation, quote_extension, confirm_extension, search_policy,
+           escalate_to_human],
 )
 
 
