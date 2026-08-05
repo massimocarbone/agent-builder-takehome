@@ -100,15 +100,28 @@ def confirm_extension(ctx: RunContextWrapper[ServicingSession], email: str, cvv:
 
 @function_tool
 def escalate_to_human(ctx: RunContextWrapper[ServicingSession], reason: str,
-                      customer_intent: str) -> dict:
+                      customer_intent: str, reservation_id: str = "") -> dict:
     """Hand off to a human agent, passing along everything collected so far.
 
     Use when the customer asks for something outside this agent's scope (including
     accepting an Avis Preferred membership upgrade), when confidence is low, or when an
     error can't be resolved by re-collecting input. The customer should never have to
-    repeat information they already gave.
+    repeat information they already gave. Pass reservation_id if the customer has given
+    one, even if you haven't looked it up yet.
     """
     session = ctx.context
+
+    # A handoff is only worth anything if it carries context. If the customer gave a
+    # reservation id but the flow escalated before it was ever looked up, load it here —
+    # otherwise the human receives an empty envelope and re-interviews the customer,
+    # which is the exact friction this handoff exists to prevent.
+    if not session.reservation and reservation_id.strip():
+        try:
+            session.reservation = get_reservation(reservation_id.strip().upper())
+        except AvisAPIError as exc:
+            log_event("escalation_lookup_failed", reservation_id=reservation_id,
+                      code=exc.code)
+
     session.escalated = True
     session.escalation_reason = reason
     session.note("customer_intent", customer_intent)
@@ -148,6 +161,9 @@ Rules you do not bend:
 - If a customer wants an Avis Preferred membership upgrade, you do not process it.
   Escalate with escalate_to_human so a representative can finalize it along with the
   extension in one go.
+- Whenever you escalate, pass the reservation ID if the customer has given one, and
+  summarize what they actually want in customer_intent. The representative should be able
+  to pick up without asking them anything twice.
 - When a tool returns escalate: true, stop working the request and hand off.
 - Never invent prices, fees, policies, or confirmation numbers. Every number you say must
   come from a tool result.
