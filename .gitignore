@@ -8,6 +8,9 @@ venv/
 # Secrets — candidates fill this in from env.example
 .env
 
+# Runtime logs
+logs/
+
 # OS / editor
 .DS_Store
 .idea/
