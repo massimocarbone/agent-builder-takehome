@@ -112,10 +112,31 @@ Triage agent → specialist handoff, using the OpenAI Agents SDK's native handof
 `data/knowledge-base/articles.json` exposed as a retrieval tool for policy questions
 (cancellation penalties, extension rules, grace periods).
 
-**Deliberately not using a vector database.** The corpus is small; simple keyword or
-lightweight embedding search is sufficient and adds no operational surface. Calling this
-out explicitly because "why no vector store" is a predictable question — the answer is
-that it wasn't needed at this corpus size, not that it was overlooked.
+**Deliberately not using a vector database.** The corpus is small (30 articles); simple
+keyword or lightweight embedding search is sufficient and adds no operational surface.
+Calling this out explicitly because "why no vector store" is a predictable question — the
+answer is that it wasn't needed at this corpus size, not that it was overlooked.
+
+**Retrieval must rank by `authority` and `last_updated`, not similarity alone.** The
+corpus contains a deliberate contradiction:
+
+| Article | Authority | Updated | Claim |
+|---|---|---|---|
+| `kb_ext_01` | `official-policy` | 2026-04-10 | Grace period is **30 minutes** |
+| `kb_fee_01` | `legacy` | 2024-09-12 | Grace period is **2 hours** |
+
+A naive keyword match on "grace period" ranks the stale `legacy` article first on term
+frequency and tells the customer something false by 90 minutes. Articles carry
+`authority` (`official-policy` > `help-center` > `legacy`) and `last_updated` precisely so
+retrieval can break ties on trustworthiness rather than wording. Ranking is therefore
+authority-weighted, and any answer drawn from a `legacy` article is either suppressed or
+surfaced with its date. This is the same source-of-truth principle as §5's "API wins,"
+applied *within* the knowledge base.
+
+**`kb_sup_01` corroborates the escalation rules** independently arrived at in §3: it names
+scheduling conflicts, high-value or complex reservations, payment issues, and "any change
+where the right outcome is unclear" as representative-handled. Where published policy and
+our design agree, the design cites it.
 
 ---
 
@@ -128,6 +149,20 @@ that it wasn't needed at this corpus size, not that it was overlooked.
 Single most important pattern in the build. Covers both halves of Avis's stated concern:
 revenue protection and customer trust. No write endpoint is ever called without the
 customer having seen and accepted the price/penalty consequence.
+
+**Enforced in code, not in the prompt.** The gate lives in `extend_flow.commit_extension`,
+which refuses to charge unless a quote the customer was shown is staged in session state.
+A model that is confused, jailbroken, or simply told "just charge it, skip the quote"
+still cannot reach the write — it gets a refusal back as a tool result. Prompt
+instructions restate the rule for conversational quality; they are not what enforces it.
+
+The API's payment requirement turns out to strengthen this: `extend`/`modify` need
+`payment.cvv` and `payment.billing_zip`, which only the customer can supply. Handing over
+the CVV *is* an affirmative act of consent, taken after the total was quoted — so the
+gate has a second, independent lock that isn't in the model's control either.
+
+Money-touching logic therefore lives in plain Python (`extend_flow.py`), separate from the
+agent definition, so it can be read, reviewed, and tested with no LLM in the loop.
 
 ### Identity verification
 
@@ -216,6 +251,17 @@ behavior is:
 3. **Shadow-logged even when off** — the agent computes what it *would* have done and
    writes it to the log without surfacing it to the customer
 
+**One honest caveat on point 3.** Shadow-logging is only free when the counterfactual is
+pure computation. The upgrade offer qualifies: deciding whether it would have fired needs
+nothing but the quote already in hand, so it is always computed and logged. Flexible-date
+alternatives do not — establishing what the agent *would* have offered means really
+calling `/quote` for each candidate date. Pretending that costs nothing would be
+dishonest, so that flag has three modes (`off` / `shadow` / `on`) instead of two, and
+`shadow` is an explicit, deliberate choice to spend the extra API traffic to gather the
+data that would justify turning it `on`. The log records `would_surface` and `max_saving`
+— what the customer would have been shown and what they would have been offered — which
+is the measurement the whole scheme exists to produce.
+
 Point 3 is what makes this an experimentation surface rather than a config toggle. Avis can
 measure the counterfactual — how often the feature would have fired, what it would have
 offered, what the price deltas looked like — before ever exposing it to a real customer.
@@ -230,7 +276,7 @@ I'd want to see for each."
 
 | Flag | Behavior | Default | Metric that would justify turning it on |
 |---|---|---|---|
-| `FLEXIBLE_DATE_ALTERNATIVES` | On extend, also quote nearby return dates and surface cheaper options | Off | Extension length delta; conversion rate; CSAT |
+| `FLEXIBLE_DATE_ALTERNATIVES_MODE` | On extend, also quote nearby return dates and surface cheaper options. Three modes — `off` / `shadow` / `on` | `off` | Extension length delta; conversion rate; CSAT |
 | `IN_FLOW_UPGRADE_OFFER` | Surface membership upgrade (standard → Avis Preferred) inside extend/modify where it would offset costs (e.g. late-fee exemption); acceptance escalates to a human with full flow context | Off | Offer→accept rate; complaint rate |
 | `CANCEL_RETENTION_PROMPT` | Offer a date change once before processing a cancellation | Off | Save rate vs. abandonment/trust signals |
 
@@ -344,6 +390,14 @@ logs are written.
 
 ## 8. Changelog
 
+- **2026-08-04** — Built `feat/extend`. Confirmation gate moved into code
+  (`extend_flow.commit_extension`) rather than prompt text; money logic separated from
+  the agent so it is testable without an LLM. Found a deliberate contradiction in the
+  knowledge base (grace period: 30 min official vs 2 hr legacy) — retrieval must rank on
+  `authority`/`last_updated`, not similarity. Flexible-date flag became three-mode
+  (`off`/`shadow`/`on`) after noticing its counterfactual is not free to compute.
+  Verified against the live API: gate refuses un-quoted writes, verification escalates at
+  threshold with full handoff payload, stale quotes re-price and block on any delta.
 - **2026-08-04** — Read the API reference; resolved all ❓ items. Key findings: no cancel
   quote (KB estimate + variance-escalation rule added); extend/modify writes require
   CVV + billing ZIP (confirmation gate gains a payment step); `Idempotency-Key` supported
