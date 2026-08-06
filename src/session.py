@@ -83,7 +83,7 @@ class ServicingSession:
         Rental times are local to the branch; deriving the offset from live data avoids
         the off-by-one-day errors that come from assuming a timezone.
         """
-        current = (self.reservation or {}).get("dates", {}).get("current_return_datetime", "")
+        current = (self.reservation or {}).get("dates", {}).get("current_return_datetime") or ""
         return current[-6:] if len(current) >= 6 and current[-6] in "+-" else "+00:00"
 
     def note(self, key: str, value: Any) -> None:

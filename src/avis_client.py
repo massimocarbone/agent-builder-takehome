@@ -147,11 +147,54 @@ def _request(method: str, path: str, *, params: dict | None = None,
                        details=last_error.details if last_error else None)
 
 
+# --- Payload validation -------------------------------------------------------------
+
+# Fields every downstream flow depends on. Validated once, here at the boundary, so the
+# flows never carry defensive .get() chains — a payload that reaches them is well-formed.
+_REQUIRED_RESERVATION_FIELDS = [
+    ("reservation_id",),
+    ("status",),
+    ("customer_id",),
+    ("customer_name",),
+    ("membership_status",),
+    ("dates", "pickup_datetime"),
+    ("dates", "current_return_datetime"),
+    ("pricing", "daily_rate"),
+    ("payment", "total_charged"),
+]
+
+
+def validate_reservation(payload: dict) -> dict:
+    """Check the fields downstream logic relies on; raise MALFORMED_RESERVATION if not.
+
+    The real API has never sent a malformed reservation — this guards against the day it
+    does. A classified terminal error here becomes a graceful escalation with a full
+    handoff payload; an unguarded KeyError three layers up becomes a dead-end apology.
+    """
+    missing = []
+    for path in _REQUIRED_RESERVATION_FIELDS:
+        node = payload
+        for key in path:
+            node = node.get(key) if isinstance(node, dict) else None
+            if node is None:
+                missing.append(".".join(path))
+                break
+    if missing:
+        raise AvisAPIError(
+            "MALFORMED_RESERVATION",
+            f"Reservation payload missing required fields: {', '.join(missing)}",
+            retryable=False,
+            details={"missing_fields": missing},
+        )
+    return payload
+
+
 # --- Reads (open; only the API key) -------------------------------------------------
 
 def get_reservation(reservation_id: str) -> dict:
-    """Look up a reservation. Raises AvisAPIError (RESERVATION_NOT_FOUND on bad id)."""
-    return _request("GET", f"/reservations/{reservation_id}")
+    """Look up a reservation. Raises AvisAPIError (RESERVATION_NOT_FOUND on bad id,
+    MALFORMED_RESERVATION if the payload is missing fields downstream logic needs)."""
+    return validate_reservation(_request("GET", f"/reservations/{reservation_id}"))
 
 
 def get_availability(location: str, vehicle_type: str, start_date: str, end_date: str) -> dict:
