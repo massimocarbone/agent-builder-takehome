@@ -75,6 +75,10 @@ def lookup_reservation(ctx: RunContextWrapper[ServicingSession], reservation_id:
     log_event("reservation_loaded", reservation_id=reservation.get("reservation_id"),
               status=reservation.get("status"), membership=reservation.get("membership_status"))
 
+    # The card's last four is withheld until the email has actually been checked against
+    # the reservation — which only happens when a write succeeds. Supplying an email is
+    # a claim, not proof, and reads are open to anyone holding a reservation id. Enforced
+    # by omission: what the model never receives, it cannot disclose.
     dates = reservation.get("dates", {})
     return {
         "ok": True,
@@ -88,7 +92,10 @@ def lookup_reservation(ctx: RunContextWrapper[ServicingSession], reservation_id:
         "pickup_datetime": dates.get("pickup_datetime"),
         "current_return_datetime": dates.get("current_return_datetime"),
         "daily_rate": reservation.get("pricing", {}).get("daily_rate"),
-        "card_last_four": reservation.get("payment", {}).get("card_on_file", {}).get("last_four"),
+        "total_charged": reservation.get("payment", {}).get("total_charged"),
+        "card_last_four": (
+            reservation.get("payment", {}).get("card_on_file", {}).get("last_four")
+            if session.verified_email else "withheld until verified"),
     }
 
 
@@ -135,6 +142,11 @@ def search_policy(query: str) -> dict:
     Use this for any policy question instead of answering from memory. If it returns no
     articles, say you don't have policy on that and offer a representative — do not
     guess. Never use an article to compute a price; prices come from quote tools only.
+
+    Deliberately NOT blocked after a handoff: a customer waiting on a representative may
+    still ask "how long do refunds take?", and answering general published policy neither
+    touches their booking nor reveals anything about it. Everything that reads or changes
+    the reservation stays blocked.
     """
     results = kb.search(query)
     if not results:
@@ -213,8 +225,11 @@ back?" is a normal, supported thing to do — the customer does not have to be m
 change to get an answer about their own booking, and you never require them to start an
 extension in order to be told something.
 
-Before the customer is verified (they give the email on file), do NOT read out the card's
-last four digits. That is the only restriction.
+You may NOT read out the card's last four digits until the customer is verified. A caller
+merely telling you an address is not verification — verification happens when a change
+goes through against the email on file. Until then the lookup returns "withheld until
+verified" for the card, and you refer to it only as "the card on file". That is the only
+restriction on reservation details.
 
 EXTENDING, in order:
 1. Get the reservation ID and look it up. Confirm you have the right rental by naming the
