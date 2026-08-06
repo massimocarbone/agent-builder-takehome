@@ -23,8 +23,17 @@ QUOTE = {"success": True, "quote": {"charges": {
 
 def _session():
     s = ServicingSession()
-    s.reservation = reservation()
+    s.load_reservation(reservation())
     return s
+
+
+def _quote_then_next_turn(session, when="2026-06-17"):
+    """Quote on one turn, then advance — the write gate requires a turn boundary, which
+    is what "the customer saw the total and replied" means structurally (audit #3)."""
+    session.turn = 1
+    extend_flow.build_quote(session, when)
+    session.turn = 2
+    return session
 
 
 def _with_stubs(quote=None, write=None):
@@ -95,8 +104,7 @@ def test_no_charge_without_a_quote_the_customer_saw():
 def test_write_allowed_once_a_quote_is_staged():
     restore = _with_stubs()
     try:
-        session = _session()
-        extend_flow.build_quote(session, "2026-06-17")
+        session = _quote_then_next_turn(_session())
         out = extend_flow.commit_extension(session, "marcus.lee@example.com", "123", "60601")
         assert out["ok"] is True and out["confirmation_number"] == "EXT-TEST", out
     finally:
@@ -110,8 +118,7 @@ def test_price_move_blocks_the_write_and_asks_again():
     config.QUOTE_TTL_SECONDS = 0
     restore = _with_stubs()
     try:
-        session = _session()
-        extend_flow.build_quote(session, "2026-06-17")
+        session = _quote_then_next_turn(_session())
         session.pending_quote.total_charged = 99.99  # pretend we quoted something else
         out = extend_flow.commit_extension(session, "marcus.lee@example.com", "123", "60601")
         assert out["ok"] is False and out.get("price_changed") is True, out

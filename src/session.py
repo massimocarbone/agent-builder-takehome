@@ -48,7 +48,15 @@ class PendingQuote:
     currency: str
     charges: dict
     quoted_at: float = field(default_factory=time.monotonic)
+    # The conversation turn this quote was created on. A write is only permitted on a
+    # LATER turn, which is what "the customer saw this number and replied" means
+    # structurally — the model cannot quote and charge inside a single turn.
+    quoted_on_turn: int = 0
     accepted: bool = False
+    # Set once the write succeeds, so a retried tool call or a replayed turn cannot
+    # charge a second time. Each write generates a fresh idempotency key, so the API's
+    # replay protection does not cover this case — only refusing here does.
+    consumed: bool = False
 
     def age_seconds(self) -> float:
         return time.monotonic() - self.quoted_at
@@ -84,6 +92,10 @@ class ServicingSession:
     # an action this agent must not take) sets this, and action tools then refuse. The
     # agent going quiet is enforced here, not requested in the prompt.
     handed_off: bool = False
+    # Incremented once per customer turn. The confirmation gate compares this against the
+    # turn a quote was staged on, so consent is measured in conversation turns rather than
+    # wall-clock time (which a fast customer or a slow test would each trip the wrong way).
+    turn: int = 0
     # Verbatim turns, secrets scrubbed. A human receives this rather than only the model's
     # own summary of events — the summary is the least trustworthy thing in the payload.
     transcript: list[dict] = field(default_factory=list)
@@ -92,6 +104,26 @@ class ServicingSession:
 
     def record(self, role: str, text: str) -> None:
         self.transcript.append({"role": role, "text": redact_text(text)})
+
+    def load_reservation(self, reservation: dict) -> None:
+        """Install a reservation, clearing anything scoped to a *different* one.
+
+        Verification, a staged quote, and the failed-attempt count are all facts about one
+        booking. Carrying them across a switch means proving you know reservation A's email
+        unlocks reservation B's card digits, and a quote priced for A can be committed
+        against B. `handed_off` is deliberately NOT reset — a terminated conversation must
+        not reopen just because the caller names another reservation.
+        """
+        incoming = (reservation or {}).get("reservation_id")
+        if incoming != self.reservation_id:
+            if self.reservation_id is not None:
+                log_event("reservation_switched", previous=self.reservation_id,
+                          new=incoming, cleared_verification=bool(self.verified_email),
+                          cleared_quote=self.pending_quote is not None)
+            self.verified_email = None
+            self.pending_quote = None
+            self.failed_verifications = 0
+        self.reservation = reservation
 
     # --- Convenience accessors ------------------------------------------------------
 
