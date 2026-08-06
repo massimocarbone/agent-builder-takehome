@@ -8,7 +8,8 @@ Deterministic scoring also makes that trap a regression test (see tests/test_kb.
 Rules enforced here rather than left to the model:
 - Authority weighting: official-policy > help-center > legacy.
 - Conflict suppression: a `legacy` article is dropped whenever a higher-authority
-  article in the same category also matched — the model never sees the conflict.
+  article exists in the same category — computed from the corpus, unconditionally,
+  not from what happened to match this query. The model never sees the conflict.
 - Score floor: below it, return nothing; the agent says it has no policy on the
   question rather than improvising.
 - Confidence: a hit resting on a single query term is flagged `low_confidence`, so a
@@ -85,6 +86,23 @@ def _idf() -> dict[str, float]:
     return {tok: log(n / count) for tok, count in df.items()}
 
 
+@lru_cache(maxsize=1)
+def _superseded_categories() -> frozenset[str]:
+    """Categories where at least one non-legacy article exists — from the corpus, not
+    from any query's match set.
+
+    The original suppression rule compared a legacy article against the *other matches
+    for the same query*, which only worked because lexical scoring is promiscuous — the
+    legacy and official articles in a category share enough vocabulary that both nearly
+    always matched together. Nothing guaranteed that: "refill the tank" matched the
+    legacy fuel article alone and served it unsuppressed. A precise retriever (the
+    librarian, embeddings) makes solo matches the norm rather than the accident, so the
+    question "is this legacy article superseded?" must be answered by the corpus, which
+    doesn't change per query — not by the match set, which does.
+    """
+    return frozenset(a["category"] for a in _corpus() if a["authority"] != "legacy")
+
+
 def _matched(query_tokens: list[str], article: dict) -> set[str]:
     """The distinct query terms this article actually contains."""
     haystack = article["_title_tokens"] | article["_category_tokens"] | article["_body_tokens"]
@@ -120,11 +138,27 @@ def search(query: str) -> list[dict]:
     scored.sort(key=lambda p: (p[0], AUTHORITY_WEIGHT.get(p[1]["authority"], 0.5),
                                p[1]["last_updated"]), reverse=True)
 
-    # Conflict suppression: drop any legacy article whose category is also covered by a
-    # higher-authority match. The stale grace-period article dies here, every time.
+    # Conflict suppression, two layers. "absolute" reads the corpus and fires whether or
+    # not anything else matched — the fix for the solo-legacy-match gap (docstring on
+    # _superseded_categories). "relative" is the original rule, comparing against this
+    # query's own matches; while the corpus-property test holds (every legacy article's
+    # category has higher-authority coverage) it is provably redundant, and it stays as
+    # a runtime net against a corpus hand-edited into deployment without the suite
+    # re-running. The stale grace-period article dies here, every time.
     categories_covered = {a["category"] for _, a in scored if a["authority"] != "legacy"}
-    results = [(s, a) for s, a in scored
-               if not (a["authority"] == "legacy" and a["category"] in categories_covered)]
+
+    def _suppressed_by(article: dict) -> str | None:
+        if article["authority"] != "legacy":
+            return None
+        if article["category"] in _superseded_categories():
+            return "absolute"
+        if article["category"] in categories_covered:
+            return "relative"
+        return None
+
+    suppressed = [{"id": a["id"], "rule": rule}
+                  for _, a in scored if (rule := _suppressed_by(a))]
+    results = [(s, a) for s, a in scored if not _suppressed_by(a)]
 
     top = results[:TOP_N]
 
@@ -144,8 +178,7 @@ def search(query: str) -> list[dict]:
                          "score": round(h["score"], 2),
                          "low_confidence": h["low_confidence"]}
                         for h in hits],
-              suppressed=[a["id"] for s, a in scored
-                          if a["authority"] == "legacy" and a["category"] in categories_covered])
+              suppressed=suppressed)
 
     return [{"id": h["article"]["id"], "title": h["article"]["title"],
              "authority": h["article"]["authority"],
