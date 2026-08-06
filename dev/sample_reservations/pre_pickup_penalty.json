@@ -1,0 +1,40 @@
+{
+  "reservation_id": "AVS-90000004",
+  "customer_id": "CUST-900004",
+  "customer_name": "Morgan Blake",
+  "membership_status": "standard",
+  "vehicle": {
+    "type": "fullsize_sedan",
+    "description": "Nissan Altima or similar",
+    "make_model": "2025 Nissan Altima",
+    "color": "Gray",
+    "license_plate": "5GHI789"
+  },
+  "pickup_location": {
+    "code": "LAX",
+    "name": "Los Angeles International Airport",
+    "address": "9217 Airport Blvd, Los Angeles, CA 90045"
+  },
+  "return_location": {
+    "code": "LAX",
+    "name": "Los Angeles International Airport",
+    "address": "9217 Airport Blvd, Los Angeles, CA 90045"
+  },
+  "dates": {
+    "pickup_datetime": "2026-08-07T11:49:04-07:00",
+    "current_return_datetime": "2026-08-10T11:49:04-07:00",
+    "original_return_datetime": "2026-08-10T11:49:04-07:00"
+  },
+  "pricing": {
+    "daily_rate": 41.99,
+    "currency": "USD"
+  },
+  "payment": {
+    "card_on_file": {
+      "type": "Visa",
+      "last_four": "6601"
+    },
+    "total_charged": 125.97
+  },
+  "status": "active"
+}
