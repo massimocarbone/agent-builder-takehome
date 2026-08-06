@@ -14,7 +14,6 @@ import os
 import random
 import sys
 import time
-import uuid
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
@@ -32,6 +31,7 @@ import kb  # noqa: E402
 import librarian  # noqa: E402
 import avis_client  # noqa: E402
 from avis_client import AvisAPIError  # noqa: E402
+from observability import correlation_context  # noqa: E402
 from session import ServicingSession, log_event  # noqa: E402
 
 # --- Tools --------------------------------------------------------------------------
@@ -435,21 +435,23 @@ def run_turn(user_input: str, servicing_session: ServicingSession, history: SQLi
     thing, surface the terminal thing.
     """
     servicing_session.turn += 1
-    servicing_session.record("customer", user_input)
-    for attempt in range(1, max_attempts + 1):
-        try:
-            result = Runner.run_sync(servicing_agent, user_input,
-                                     context=servicing_session, session=history)
-            servicing_session.record("agent", str(result.final_output))
-            return result
-        except Exception as exc:  # noqa: BLE001 - provider SDKs raise varied types
-            transient = type(exc).__name__ in {"RateLimitError", "APIConnectionError",
-                                               "APITimeoutError", "InternalServerError"}
-            log_event("llm_call_failed", type=type(exc).__name__, attempt=attempt,
-                      transient=transient, error=str(exc)[:200])
-            if not transient or attempt == max_attempts:
-                raise
-            time.sleep(min(60, 20 * attempt) + random.uniform(0, 3))
+    with correlation_context(conversation_id=servicing_session.conversation_id,
+                             turn_id=servicing_session.turn):
+        servicing_session.record("customer", user_input)
+        for attempt in range(1, max_attempts + 1):
+            try:
+                result = Runner.run_sync(servicing_agent, user_input,
+                                         context=servicing_session, session=history)
+                servicing_session.record("agent", str(result.final_output))
+                return result
+            except Exception as exc:  # noqa: BLE001 - provider SDKs raise varied types
+                transient = type(exc).__name__ in {"RateLimitError", "APIConnectionError",
+                                                   "APITimeoutError", "InternalServerError"}
+                log_event("llm_call_failed", type=type(exc).__name__, attempt=attempt,
+                          transient=transient, error=str(exc)[:200])
+                if not transient or attempt == max_attempts:
+                    raise
+                time.sleep(min(60, 20 * attempt) + random.uniform(0, 3))
     raise RuntimeError("unreachable")
 
 
@@ -462,7 +464,7 @@ def main() -> None:
     # it synchronously silently does nothing and the previous customer's transcript would
     # carry into this one — a privacy bug, not just stale context.
     servicing_session = ServicingSession()
-    history = SQLiteSession(f"avis-cli-{uuid.uuid4()}")
+    history = SQLiteSession(f"avis-cli-{servicing_session.conversation_id}")
 
     print("Avis servicing agent — extend or cancel an existing rental. Ctrl-C or 'quit' to exit.\n")
     print("Agent: Hi! I'm Avis's automated assistant — I can help extend or cancel a "

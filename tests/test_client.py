@@ -116,7 +116,7 @@ def test_secrets_never_reach_the_log():
     with fake_transport([OK_WRITE]):
         avis_client.extend_reservation("AVS-48372915", "2026-06-12T15:00:00-05:00",
                                        "marcus.lee@example.com", "987", "60601")
-    last = j.loads(open(avis_client.LOG_DIR / "api.jsonl").readlines()[-1])
+    last = j.loads((avis_client.LOG_DIR / "api.jsonl").read_text().splitlines()[-1])
     flat = j.dumps(last)
     assert "987" not in flat and "marcus.lee" not in flat, f"secret leaked: {flat}"
 
