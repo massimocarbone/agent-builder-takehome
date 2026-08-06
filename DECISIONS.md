@@ -226,6 +226,112 @@ also keeps the boundary where §3 says invented reasons belong: visible, not inf
 The clean fix is a semantic one, which is the strongest argument yet catalogued for
 embeddings at a corpus size where they'd otherwise be overkill.
 
+### Evaluated: an LLM-mediated retrieval stage ("librarian"), decided against building it now
+
+The homonym gap above is real and worth taking seriously, so before leaving it as
+documented residual risk, the option of closing it with LLM judgment was evaluated
+properly — feasibility, mechanism, and cost — rather than dismissed or reached for
+reflexively.
+
+**Framing correction that mattered:** the original framing conflated "an agent" with
+"LLM-mediated semantics." They're different commitments. An agent implies autonomy —
+its own instructions, potential tool use, a reasoning loop. Picking the best-matching
+article from a fixed 30-item list isn't that kind of task; it's classification, and fits
+a single structured, non-agentic call — one shot, candidate titles in context, return
+matching IDs, no loop. That distinction is what kept this from turning into a bigger
+architectural commitment than the actual problem needs. Every serious bug found in this
+build has come from LLM judgment surface (hallucinated reasons, hallucinated policy,
+ambiguous consent) — never from the deterministic client or gate code. A new autonomous
+agent hop would be more of exactly that surface, for a task that doesn't require
+autonomy to solve.
+
+**On the specific proposal to have the agent memorize a KB summary and feed guesses into
+future embeddings:** reframed rather than adopted as stated. An agent holding its own
+compressed memory of the corpus makes that memory a *second source of truth* — every KB
+edit now needs two things kept in sync, which is exactly the class of gap that produced
+the legacy grace-period article in the first place. The version that scales cleanly
+instead: the LLM's job is understanding the *question* (turning messy customer phrasing
+into a better query — an established RAG technique, not novel), and retrieval — lexical
+today, embeddings later — does the lookup against the *real* corpus. No second copy of
+the KB to keep current.
+
+**A concrete implementation plan for this was independently produced and reviewed.**
+Verified against the running code (confirmed live: `kb.search("what is your pet
+policy")` now correctly returns nothing, and the "damage waiver" / "late-fee waiver"
+homonym still surfaces flagged `low_confidence` — matching what this section already
+documented) before being trusted. The plan held up well and is worth recording:
+
+- **A real, independent bug, worth fixing regardless of the rest.** The current
+  suppression rule only fires when a higher-authority article *also* matches the same
+  query (`categories_covered` is built from what scored, not from the corpus). A precise
+  retriever — semantic or otherwise — that matched `kb_fee_01` alone, without
+  `kb_fee_02` also matching, would sail through unsuppressed today. Lexical scoring's
+  breadth currently masks this by making the two nearly always match together; nothing
+  in the mechanism actually prevents the gap. Fix: suppression computed unconditionally
+  from the corpus (any legacy article whose *category* contains a higher-authority
+  article gets suppressed, independent of what matched this query), backed by a
+  corpus-property test asserting the precondition holds for every legacy article. Once
+  that invariant is enforced, the *existing* relative rule (suppress only when a
+  higher-authority article also matched) becomes provably redundant for every case it
+  could fire on — worth keeping anyway, not for "legacy-vs-legacy" as first framed, but
+  as a runtime safety net against a corpus deployed without the property test re-running
+  (a hand-edited `articles.json` outside the suite). **Ships as its own PR regardless of
+  whether the rest is built** — it's a correctness gap in code that exists today, not
+  a librarian-only concern.
+- **A clean architectural seam**, splitting retrieval into a swappable candidate
+  producer (`(query) -> [ids]`) and a deterministic finalizer that always runs
+  regardless of producer: validates IDs against the real corpus, applies suppression,
+  sorts, caps, flags confidence, logs provenance, and hydrates article bodies verbatim
+  from the corpus — never from anything a producer supplies. That last property is worth
+  stating as a named guarantee, not just an implementation detail: a producer can never
+  inject fabricated *content*, only propose an ID that gets checked against ground
+  truth. This mirrors the existing pattern of keeping money/safety logic in deterministic
+  code (`extend_flow`, `cancel_flow`) and generalizes it to retrieval safety.
+- **A librarian module** built on a compact index derived mechanically from the corpus
+  at load time (title, category, authority, first sentence — not hand-maintained
+  prose), a short static business-context block, structured output (article IDs plus a
+  `no_coverage` flag; a reason field for the log only, never surfaced — closing the
+  "never invent a reason" rule by construction rather than by instruction), hallucinated
+  IDs dropped and counted as a first-class metric, and a hard timeout with "never raise,
+  return None, caller falls back to lexical." One correction made to the plan as
+  proposed: it claimed the compact-index mechanism was "scale-invariant... same shape"
+  at thousands of articles. The arithmetic doesn't support that — 30 articles at roughly
+  40 tokens each is ~1,200 tokens; linear scaling to 3,000 articles is ~120,000 tokens in
+  a single prompt, well past where list-scanning precision measurably degrades regardless
+  of context window size. What's actually scale-invariant is the producer/finalizer
+  **seam** from the point above — the interface survives; this specific producer is
+  good for the current and near-term corpus (tens to low hundreds of articles), and true
+  scale means swapping in an embeddings-backed producer behind the same finalizer, not
+  growing the in-context index.
+- **A three-mode flag** (`lexical` / `shadow` / `librarian`), justified the same way
+  `FLEXIBLE_DATE_ALTERNATIVES_MODE` already is: the shadow counterfactual costs a real
+  LLM call, so running it is a deliberate spend, not a free log line. Fallback to
+  lexical on any failure is what makes this a strict upgrade rather than a new single
+  point of failure — the lexical retriever isn't replaced, it becomes the floor.
+- **One risk flagged during review, not yet in the plan:** the librarian would run as a
+  nested `Runner.run()` inside a tool call, itself inside the outer `run_turn`'s
+  rate-limit retry wrapper. The "never raise" guard needs to hold specifically across a
+  *nested* timeout or rate-limit, not just an ordinary exception — if a nested failure
+  ever escaped as a raised exception, it could trip the outer retry and re-run tool
+  calls that already succeeded (e.g. a `lookup_reservation` that already completed).
+  Needs an explicit test before this ships: a librarian-level failure must not surface
+  to `run_turn`'s outer retry.
+- **One gap flagged in the eval design:** shadow-mode comparison logging needs to record
+  every attempt, including librarian failures (timeout, error, all-IDs-hallucinated),
+  not only successful comparisons. Logging only successes would bias the exact dataset
+  this mechanism exists to produce — the "how often does the librarian actually work"
+  number is precisely what determines whether it's worth turning on, and dropping
+  failures from the log would make it look more reliable than it is.
+
+**Decision: build the independently-real Phase 0 fix now, as its own PR. Hold the
+librarian itself.** Full estimated cost across the whole plan is ~4 hours; the residual
+gap it would close is narrow (one class of lexical homonym) and already honestly
+mitigated by the `low_confidence` flag shipped above. That's a real scope commitment
+against a stress-testing session, not something to fall into by default because the
+plan is good — and it is good; the reasons for holding are cost and priority, not
+quality. Revisit if shadow-style evidence (or a stress-testing finding) makes the case
+that the residual gap is costing more than the mitigation is worth.
+
 ### Testing strategy: fixtures from real payloads, never invented from scratch
 
 Several cancel-policy branches (pre-pickup cancellation, non-refundable rates, pay-at-
@@ -826,6 +932,20 @@ logs are written.
 
 ## 8. Changelog
 
+- **2026-08-06** — Evaluated an LLM-mediated ("librarian") retrieval stage for the
+  homonym gap documented above. Reframed "agent" into "single non-agentic classification
+  call" and "agent memorizes the KB" into "agent rewrites the query, retrieval still
+  reads the real corpus" — both changes to the original framing, not the substance.
+  Independently produced implementation plan reviewed against the running code: caught
+  one real, standalone bug (suppression only fires when a higher-authority article also
+  matches the same query, not unconditionally from the corpus) worth fixing regardless
+  of the rest, one overclaim (the compact-index producer is not scale-invariant to
+  thousands of articles the way the producer/finalizer seam itself is), and two testing
+  gaps (a nested-Runner failure mode against the outer retry wrapper; shadow-mode
+  logging needs to capture librarian failures, not just successful comparisons, or the
+  counterfactual data is biased). Decision: ship the standalone suppression fix, hold
+  the librarian itself — real cost (~4h) against a narrow, already-mitigated gap, and a
+  scope change against the stress-testing time budget set the prior session.
 - **2026-08-06** — Adversarial testing pass (external tool) produced ten strict-xfail
   tests; **six fixed and graduated, one fixed in part, three deferred with reasons**, all
   nine new guards mutation-verified. First finding was in the pass itself: a module-level
