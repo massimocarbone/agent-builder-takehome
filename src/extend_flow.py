@@ -38,21 +38,30 @@ def normalize_datetime(raw: str, session: ServicingSession) -> str:
     offset = session.return_utc_offset
     current = (session.reservation or {}).get("dates", {}).get("current_return_datetime", "")
 
-    # Date only — keep the existing return time of day.
     if len(text) == 10:
+        # Date only — keep the existing return time of day.
         time_of_day = current[11:19] if len(current) >= 19 else "12:00:00"
-        return f"{text}T{time_of_day}{offset}"
-
-    try:
+        normalized = f"{text}T{time_of_day}{offset}"
+    else:
         has_offset = len(text) >= 6 and (text[-6] in "+-" or text.endswith("Z"))
-    except IndexError:
-        has_offset = False
+        if not has_offset:
+            if len(text) == 16:  # YYYY-MM-DDTHH:MM
+                text += ":00"
+            normalized = f"{text}{offset}"
+        else:
+            normalized = text
 
-    if not has_offset:
-        if len(text) == 16:  # YYYY-MM-DDTHH:MM
-            text += ":00"
-        return f"{text}{offset}"
-    return text
+    # Customers say "June 17th"; the model may pass that straight through. Fail as a
+    # FlowError the agent can recover from by re-asking, never as a raw ValueError that
+    # escapes the tool.
+    try:
+        _parse(normalized)
+    except ValueError:
+        raise FlowError(
+            f"Could not read {raw!r} as a date and time. Ask the customer to confirm the "
+            "return date, then pass it as YYYY-MM-DD or YYYY-MM-DDTHH:MM."
+        ) from None
+    return normalized
 
 
 def _parse(dt: str) -> datetime:
@@ -157,7 +166,11 @@ def _date_alternatives(session: ServicingSession, target: str, charges: dict) ->
             resp = quote_change(session.reservation_id, "extend", candidate.isoformat())
             return {"new_return_datetime": candidate.isoformat(),
                     "total_charged": _charges(resp).get("total_charged")}
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 - speculative work must never block
+            # Dropped silently from the customer's view, but not from ours: an unlogged
+            # blanket catch would hide a coding bug in here forever.
+            log_event("alternative_quote_dropped", reservation_id=session.reservation_id,
+                      candidate=candidate.isoformat(), error=f"{type(exc).__name__}: {exc}")
             return None
 
     results = []

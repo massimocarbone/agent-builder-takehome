@@ -113,6 +113,34 @@ assertion is at the **agent** level — that it declines — not at the retrieva
 
 ## Cleared
 
+### 14. Card last-four disclosed to an unverified caller — FIXED
+Found during the 2026-08-05 bug sweep. Asked to extend, the agent replied *"I'll charge
+your card ending in 1122"* with `verified_email` still `None`. Reads are open, so anyone
+holding a reservation ID could supply **any** email and be read the card's last four.
+
+Root cause was an ambiguous instruction — *"before the customer is verified (they give the
+email on file)"* reads as though supplying an email **is** verification, when verification
+only actually happens when a write succeeds against the email on file.
+
+Fixed by omission rather than instruction: `lookup_reservation` now returns
+`"withheld until verified"` for the card unless `session.verified_email` is set. What the
+model never receives, it cannot disclose. Retested — the agent now says "your card on
+file" with no digits.
+
+### 15. Unparseable datetimes escaped as ValueError — FIXED
+`build_quote("June 17th")` raised a raw `ValueError` out of the tool instead of a
+recoverable `FlowError`. Six of eight malformed inputs crashed, including `2026-13-45` and
+`17/06/2026`, which slipped past the first fix via an early return in the date-only
+branch. Customers say "June 17th" and the model may pass it straight through. All paths
+now validate and raise `FlowError`, which the agent recovers from by re-asking.
+
+### 16. `test_hard_handoff_blocks_every_action_tool` was a fake pass — FIXED
+The test looped over tool names and then asserted on `_blocked()` directly, never invoking
+a tool — it would have passed with every guard removed. Now calls each tool's real
+implementation via `__wrapped__`, and mutation-tested: deleting the guard from
+`confirm_extension` makes it fail, restoring it makes it pass. Third instance of this
+class of bug (see #11); worth checking for deliberately.
+
 ### 12. Escalation is advisory, not terminal — FIXED
 `handed_off` is now a distinct terminal state that action tools check via `_blocked()`.
 Split into `kind="hard"` (terminal: cancel, upgrade, repeated verification failure) and

@@ -15,21 +15,48 @@ from session import ServicingSession, redact_text  # noqa: E402
 
 
 def _call(tool, session, **kwargs):
-    """Invoke a @function_tool's underlying implementation with a fake run context."""
+    """Invoke a @function_tool's real implementation with a fake run context.
+
+    function_tool wraps the function but keeps it on __wrapped__. Calling that is what
+    makes this a real test — asserting on _blocked() directly would pass even if no tool
+    ever consulted it.
+    """
     class Ctx:
         context = session
-    return tool.__wrapped__(Ctx(), **kwargs) if hasattr(tool, "__wrapped__") else None
+    return tool.__wrapped__(Ctx(), **kwargs)
 
 
 def test_hard_handoff_blocks_every_action_tool():
-    session = ServicingSession()
-    session.handed_off = True
-    for name, kwargs in [("lookup_reservation", {"reservation_id": "AVS-48372915"}),
-                         ("quote_extension", {"new_return_datetime": "2026-06-12"}),
-                         ("confirm_extension", {"email": "marcus.lee@example.com",
-                                                "cvv": "123", "billing_zip": "60601"})]:
-        out = agent._blocked(session)
-        assert out is not None and out["handed_off"] is True, name
+    """Each tool must consult the terminal state itself. If one forgets, the agent can
+    still act after announcing a handoff — the exact 2026-08-05 failure."""
+    cases = [
+        (agent.lookup_reservation, {"reservation_id": "AVS-48372915"}),
+        (agent.quote_extension, {"new_return_datetime": "2026-06-12"}),
+        (agent.confirm_extension, {"email": "marcus.lee@example.com",
+                                   "cvv": "123", "billing_zip": "60601"}),
+    ]
+    for tool, kwargs in cases:
+        session = ServicingSession()
+        session.handed_off = True
+        out = _call(tool, session, **kwargs)
+        assert out.get("handed_off") is True, f"{tool.name} acted after handoff: {out}"
+        assert out["ok"] is False, tool.name
+
+
+def test_blocked_tools_make_no_api_call():
+    """Refusal must be structural, not a post-hoc filter — a blocked lookup that still
+    hits the API would leak reservation data into a handed-off session."""
+    import avis_client
+    calls = []
+    original = avis_client.get_reservation
+    avis_client.get_reservation = lambda rid: calls.append(rid)
+    try:
+        session = ServicingSession()
+        session.handed_off = True
+        _call(agent.lookup_reservation, session, reservation_id="AVS-48372915")
+    finally:
+        avis_client.get_reservation = original
+    assert calls == [], f"blocked tool still called the API: {calls}"
 
 
 def test_open_session_is_not_blocked():
@@ -73,6 +100,26 @@ def test_redaction_variants():
     assert "4321" not in redact_text("the cvc is 4321")
     assert "999" not in redact_text("security code 999")
     assert redact_text("i want to return june 12") == "i want to return june 12"
+
+
+def test_card_last_four_withheld_until_verified():
+    """Reads are open to anyone holding a reservation id, and supplying an email is a
+    claim rather than proof. Enforced by omission: the model never receives the digits."""
+    import avis_client
+    from fixtures import reservation as fixture
+    orig = avis_client.get_reservation
+    avis_client.get_reservation = lambda rid: fixture()
+    try:
+        unverified = ServicingSession()
+        out = _call(agent.lookup_reservation, unverified, reservation_id="AVS-48372915")
+        assert out["card_last_four"] == "withheld until verified", out["card_last_four"]
+
+        verified = ServicingSession()
+        verified.verified_email = "marcus.lee@example.com"
+        out = _call(agent.lookup_reservation, verified, reservation_id="AVS-48372915")
+        assert out["card_last_four"].isdigit(), out["card_last_four"]
+    finally:
+        avis_client.get_reservation = orig
 
 
 if __name__ == "__main__":
