@@ -14,7 +14,7 @@ import avis_client  # noqa: E402
 import config  # noqa: E402
 import extend_flow  # noqa: E402
 from avis_client import AvisAPIError  # noqa: E402
-from fixtures import reservation  # noqa: E402
+from fixtures import EXTEND_TEST_NOW, reservation  # noqa: E402
 from session import ServicingSession  # noqa: E402
 
 avis_client.BACKOFF_BASE_S = 0
@@ -41,7 +41,7 @@ def _stub_client(quote=None, write=None):
 def _staged(session, turn_now=2):
     """A session with a quote the customer has 'seen' (staged on an earlier turn)."""
     session.turn = 1
-    extend_flow.build_quote(session, "2026-06-17")
+    extend_flow.build_quote(session, "2026-06-17", now=EXTEND_TEST_NOW)
     session.turn = turn_now
     return session
 
@@ -128,7 +128,7 @@ def test_quote_and_charge_in_one_turn_is_refused():
     try:
         session = _session()
         session.turn = 1
-        extend_flow.build_quote(session, "2026-06-17")
+        extend_flow.build_quote(session, "2026-06-17", now=EXTEND_TEST_NOW)
         out = extend_flow.commit_extension(session, "marcus.lee@example.com", "123", "60601")
         assert out["ok"] is False, "charged within the same turn the quote was created"
         assert "not seen" in out["customer_message"], out
@@ -156,7 +156,7 @@ def test_quote_without_total_is_rejected():
     try:
         session = _session()
         try:
-            extend_flow.build_quote(session, "2026-06-17")
+            extend_flow.build_quote(session, "2026-06-17", now=EXTEND_TEST_NOW)
             raise AssertionError("a quote with no total was accepted")
         except extend_flow.FlowError:
             pass
@@ -231,7 +231,7 @@ def test_slow_alternatives_do_not_block_the_primary_quote():
     try:
         session = _session()
         started = _time.monotonic()
-        out = extend_flow.build_quote(session, "2026-06-17")
+        out = extend_flow.build_quote(session, "2026-06-17", now=EXTEND_TEST_NOW)
         elapsed = _time.monotonic() - started
         assert out["total_charged"] == 159.47, out
         assert elapsed < 3, f"primary quote blocked {elapsed:.1f}s on speculative work"
