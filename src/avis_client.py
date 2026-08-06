@@ -20,17 +20,15 @@ Run directly to smoke-test connectivity:
 """
 from __future__ import annotations
 
-import json
-import logging
 import os
 import time
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import requests
 from dotenv import load_dotenv
+from observability import correlation_context, get_log_dir, jsonl_logger, log_json, redact
 
 load_dotenv()
 
@@ -41,17 +39,8 @@ REQUEST_TIMEOUT_S = float(os.environ.get("AVIS_TIMEOUT_S", "15"))
 MAX_ATTEMPTS = int(os.environ.get("AVIS_MAX_ATTEMPTS", "4"))
 BACKOFF_BASE_S = 0.5
 
-LOG_DIR = Path(os.environ.get("LOG_DIR", Path(__file__).resolve().parent.parent / "logs"))
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-_REDACTED_FIELDS = {"cvv", "billing_zip", "email"}
-
-logger = logging.getLogger("avis_client")
-if not logger.handlers:
-    logger.setLevel(logging.INFO)
-    _handler = logging.FileHandler(LOG_DIR / "api.jsonl")
-    _handler.setFormatter(logging.Formatter("%(message)s"))
-    logger.addHandler(_handler)
+LOG_DIR = get_log_dir()  # retained for callers/tests that inspect the API log directly
+logger = jsonl_logger("avis_client", "api.jsonl")
 
 
 class AvisAPIError(Exception):
@@ -76,16 +65,12 @@ class AvisAPIError(Exception):
 
 
 def _redact(obj: Any) -> Any:
-    if isinstance(obj, dict):
-        return {k: ("***" if k in _REDACTED_FIELDS else _redact(v)) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_redact(v) for v in obj]
-    return obj
+    """Backward-compatible alias for the shared recursive redactor."""
+    return redact(obj)
 
 
 def _log(**fields: Any) -> None:
-    fields["ts"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    logger.info(json.dumps(fields, default=str))
+    log_json(logger, "api_request", **fields)
 
 
 def _request(method: str, path: str, *, params: dict | None = None,
@@ -103,63 +88,66 @@ def _request(method: str, path: str, *, params: dict | None = None,
     if idempotent_write:
         headers["Idempotency-Key"] = str(uuid.uuid4())
 
+    operation_id = str(uuid.uuid4())
     last_error: AvisAPIError | None = None
-    for attempt in range(1, MAX_ATTEMPTS + 1):
-        started = time.monotonic()
-        outcome, status = "ok", None
-        try:
-            resp = requests.request(method, url, headers=headers, params=params,
-                                    json=body, timeout=REQUEST_TIMEOUT_S)
-            status = resp.status_code
-            if resp.ok:
-                try:
-                    payload = resp.json()
-                except ValueError:
-                    outcome = "error:MALFORMED_RESPONSE"
-                    raise AvisAPIError("MALFORMED_RESPONSE",
-                                       f"{method} {path} returned {status} with a "
-                                       f"non-JSON body: {resp.text[:200]}",
-                                       status=status, retryable=False) from None
+    with correlation_context(operation_id=operation_id):
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            started = time.monotonic()
+            outcome, status = "ok", None
+            try:
+                resp = requests.request(method, url, headers=headers, params=params,
+                                        json=body, timeout=REQUEST_TIMEOUT_S)
+                status = resp.status_code
+                if resp.ok:
+                    try:
+                        payload = resp.json()
+                    except ValueError:
+                        outcome = "error:MALFORMED_RESPONSE"
+                        raise AvisAPIError("MALFORMED_RESPONSE",
+                                           f"{method} {path} returned {status} with a "
+                                           f"non-JSON body: {resp.text[:200]}",
+                                           status=status, retryable=False) from None
                 # A 2xx carrying the documented failure envelope. Undocumented — the
                 # reference ties errors to 4xx/5xx — but the status line is the API's
                 # claim about itself and the body is its account of what happened, and
                 # trusting the former when they disagree turns a declined payment into a
                 # confirmed extension. This is the only layer that can catch it before it
                 # becomes a confirmation number read out to a customer.
-                if isinstance(payload, dict) and payload.get("success") is False:
-                    envelope = payload.get("error") or {}
-                    code = envelope.get("code", "UNSPECIFIED_FAILURE")
-                    outcome = f"error:{code}"
-                    raise AvisAPIError(code, envelope.get("message", code), status=status,
-                                       retryable=False, details=envelope.get("details"))
-                return payload
+                    if isinstance(payload, dict) and payload.get("success") is False:
+                        envelope = payload.get("error") or {}
+                        code = envelope.get("code", "UNSPECIFIED_FAILURE")
+                        outcome = f"error:{code}"
+                        raise AvisAPIError(code, envelope.get("message", code), status=status,
+                                           retryable=False, details=envelope.get("details"))
+                    return payload
 
-            try:
-                envelope = resp.json().get("error", {})
-            except ValueError:
-                envelope = {}
-            code = envelope.get("code", f"HTTP_{status}")
-            message = envelope.get("message", resp.text[:200])
-            transient = status >= 500
-            outcome = f"error:{code}"
-            last_error = AvisAPIError(code, message, status=status,
-                                      retryable=transient, details=envelope.get("details"))
-            if not transient:
-                raise last_error
-        except requests.Timeout:
-            outcome = "timeout"
-            last_error = AvisAPIError("TIMEOUT", f"{method} {path} timed out after {REQUEST_TIMEOUT_S}s",
-                                      retryable=True)
-        except requests.ConnectionError as exc:
-            outcome = "connection_error"
-            last_error = AvisAPIError("CONNECTION_ERROR", str(exc), retryable=True)
-        finally:
-            _log(endpoint=f"{method} {path}", params=_redact(params), body=_redact(body),
-                 status=status, attempt=attempt, latency_ms=round((time.monotonic() - started) * 1000),
-                 outcome=outcome)
+                try:
+                    envelope = resp.json().get("error", {})
+                except ValueError:
+                    envelope = {}
+                code = envelope.get("code", f"HTTP_{status}")
+                message = envelope.get("message", resp.text[:200])
+                transient = status >= 500
+                outcome = f"error:{code}"
+                last_error = AvisAPIError(code, message, status=status,
+                                          retryable=transient, details=envelope.get("details"))
+                if not transient:
+                    raise last_error
+            except requests.Timeout:
+                outcome = "timeout"
+                last_error = AvisAPIError(
+                    "TIMEOUT", f"{method} {path} timed out after {REQUEST_TIMEOUT_S}s",
+                    retryable=True)
+            except requests.ConnectionError as exc:
+                outcome = "connection_error"
+                last_error = AvisAPIError("CONNECTION_ERROR", str(exc), retryable=True)
+            finally:
+                _log(endpoint=f"{method} {path}", params=params, body=body,
+                     status=status, attempt=attempt,
+                     latency_ms=round((time.monotonic() - started) * 1000), outcome=outcome)
 
-        if attempt < MAX_ATTEMPTS:
-            time.sleep(BACKOFF_BASE_S * (2 ** (attempt - 1)))
+            if attempt < MAX_ATTEMPTS:
+                time.sleep(BACKOFF_BASE_S * (2 ** (attempt - 1)))
 
     raise AvisAPIError("EXHAUSTED_RETRIES",
                        f"{method} {path} failed after {MAX_ATTEMPTS} attempts: {last_error}",

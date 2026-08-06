@@ -10,6 +10,7 @@ venv/
 
 # Runtime logs
 logs/
+artifacts/test-runs/
 
 # OS / editor
 .DS_Store

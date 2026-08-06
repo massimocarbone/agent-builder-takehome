@@ -465,6 +465,82 @@ nothing complained, right up until post-write reconciliation needed a total to r
 against and found the fixture had never had one. An abbreviated stub silently narrows
 what the suite is capable of noticing.
 
+### Local test evidence is a run artifact, not an append-only log
+
+The original JSONL files were useful while developing, but every invocation appended to
+the same `logs/` directory. That makes a failed test hard to reconstruct: the console,
+pytest outcome, agent decisions, and API retries may belong to different runs, and a
+developer can accidentally present stale evidence as current evidence.
+
+`scripts/run_tests.py` now creates one immutable directory per invocation under
+`artifacts/test-runs/<run-id>/`. It keeps the console transcript, pytest log, JUnit XML,
+structured agent/API events, environment metadata, and a machine-readable summary
+together. A generated timestamp-plus-random suffix prevents concurrent agents from
+overwriting each other; an explicit duplicate run id fails instead of appending. The
+wrapper sets `LOG_DIR` before importing application modules because the file handlers are
+constructed at import time. Direct production imports still fail fast without real Avis
+configuration; only the test subprocess receives inert `.invalid` credentials.
+
+**Correlation follows the lifecycle that needs debugging.** `run_id` identifies one
+test invocation, `test_id` one pytest case, `conversation_id` one customer session,
+`turn_id` one customer turn, and `operation_id` one logical API operation across all of
+its attempts. These values live in `contextvars`, which preserves isolation across async
+tasks without threading identifiers through every function signature. The API operation
+id is deliberately distinct from the write's idempotency key: the former is safe
+diagnostic identity for reads and writes; the latter is an API contract with replay
+semantics and should not become a general tracing primitive.
+
+**Redaction happens at the serialization boundary, recursively.** Sensitive keys and
+obvious secret-shaped strings are scrubbed before either logger writes. The runner then
+scans every textual artifact and fails the run if an obvious email, card number, or
+contextual CVV remains. That second pass caught false positives of its own (long decimal
+money representations and numeric stretches inside UUIDs), so those cases are regression
+tests too. The scan is defense in depth, not a claim that regex replaces access control,
+retention policy, or a production secret-detection service.
+
+This machinery is kept on `codex/test-run-artifacts` as a standalone, low-risk layer.
+The generative suites build on top of it but are not required to get isolated evidence
+from ordinary deterministic tests.
+
+### Generative testing explores boundaries and sequences, not invented product behavior
+
+Named examples remain the clearest executable specification: "exactly 48 hours uses the
+penalty branch" is easier to defend than a generated timestamp with no story attached.
+Their weakness is combinatorics. Payload omissions, nearby datetimes, retry prefixes,
+money values, and action orderings multiply faster than handwritten cases can cover.
+Hypothesis is added as a complement, not a replacement.
+
+The property strategies preserve the real-fixture rule above. They begin with captured
+reservation shapes and vary only the field relevant to the property. The assertions are
+business invariants rather than snapshots: required fields always fail closed; targets at
+or before the current return never quote; cancellation penalty plus refund conserves the
+prepaid amount; transient retries stay bounded and reuse one idempotency key; terminal
+client errors stop immediately. Explicit examples pin the meaningful edges (48 hours,
+zero hours, one cent around a variance threshold) while generated examples explore the
+space between them.
+
+The rule-based state machine covers the other dimension: valid operations in hostile
+orders. It interleaves reservation loads and switches, turn advancement, quotes,
+repricing, confirmations, cancellation estimates and disambiguation, retries, early
+return, and hard handoff. Always-on invariants assert that no write occurs on the quote's
+turn, one staged object authorizes at most one write, switching reservations clears
+reservation-scoped authority, early-return resolution leaves nothing cancellable, and a
+terminal handoff never reopens. The HTTP and LLM boundaries remain deterministic stubs;
+the machine exercises the real session and flow gates, not provider availability.
+
+Both suites are deliberately bounded for a take-home (`30` property examples; `35`
+state-machine examples × `25` steps) and make no live API or model calls. A seed can be
+recorded for exact reproduction, while Hypothesis still shrinks a failing generated case
+to the smallest useful sequence. This is broader confidence, not formal verification:
+the strategy only finds cases inside the model we wrote, and the live librarian quality
+eval remains a separate probabilistic measurement.
+
+The branch boundary is part of the risk decision. `codex/test-run-artifacts` can ship on
+its own; `codex/test-harness-experiments` adds Hypothesis and the generative suites above
+it. Developers can run either file, a `-k` slice, or the ordinary deterministic suite
+through the same artifact wrapper. We only roll the experimental layer into the final
+deliverable if its maintenance cost and failures remain intelligible rather than noisy.
+
 ### `xfail` records a decision, never a result
 
 A later testing pass added ten adversarial tests under a module-level

@@ -98,6 +98,44 @@ does not collect (quality is probabilistic; it must not gate the build):
 python tests/eval_librarian.py
 ```
 
+### Isolated local test artifacts
+
+For a production-like local run, use the wrapper instead of invoking pytest directly:
+
+```bash
+python scripts/run_tests.py
+python scripts/run_tests.py tests/test_client.py -k retry
+```
+
+Each invocation creates `artifacts/test-runs/<run-id>/` containing `metadata.json`,
+`summary.json`, `console.log`, `pytest.log`, `junit.xml`, `agent.jsonl`, and `api.jsonl`.
+The directory is git-ignored and one run never appends to another. The wrapper supplies
+fake Avis credentials only to the test subprocess (all HTTP is scripted); production
+imports still fail fast when real configuration is absent.
+
+Decision and API JSONL events carry available `run_id`, `test_id`, `conversation_id`,
+`turn_id`, and `operation_id` fields. One operation ID spans all retries of a request,
+while write idempotency keys keep their existing retry-safety behavior. Known email,
+card, CVV, billing-ZIP, authorization, and API-key values are recursively redacted. The
+run summary also scans the structured JSONL artifacts for obvious raw email/card/CVV
+patterns and returns a non-zero status if it finds one. Treat this as a guardrail, not a
+replacement for access control or a dedicated secret scanner.
+
+### Generative safety tests
+
+Hypothesis broadens the deterministic safety suite beyond the named examples:
+
+```bash
+python -m pytest tests/test_properties.py tests/test_state_machine.py
+```
+
+The property tests minimally mutate captured reservation fixtures around validation,
+datetime, pricing, cancellation, retry, and idempotency boundaries. The rule-based state
+machine explores interleaved reservation switches, quotes, confirmations, repricing,
+cancellation disambiguation, and hard handoffs. Both use bounded local settings and
+scripted transports, so they do not call the live Avis API or an LLM. To reproduce an
+exact stateful run, pass a seed such as `--hypothesis-seed=20260806`.
+
 ## Then build
 
 Head to [`BRIEF.md`](BRIEF.md). Build the RAG foundation and escalation logic first, then

@@ -11,31 +11,20 @@ enforced structurally rather than by prompt compliance. Two things depend on thi
 """
 from __future__ import annotations
 
-import json
-import logging
-import os
 import re
 import time
 from dataclasses import dataclass, field, asdict
-from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
-LOG_DIR = Path(os.environ.get("LOG_DIR", Path(__file__).resolve().parent.parent / "logs"))
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+from observability import jsonl_logger, log_json
 
-_agent_logger = logging.getLogger("avis_agent")
-if not _agent_logger.handlers:
-    _agent_logger.setLevel(logging.INFO)
-    _h = logging.FileHandler(LOG_DIR / "agent.jsonl")
-    _h.setFormatter(logging.Formatter("%(message)s"))
-    _agent_logger.addHandler(_h)
+_agent_logger = jsonl_logger("avis_agent", "agent.jsonl")
 
 
 def log_event(event: str, **fields: Any) -> None:
     """Append a structured decision/outcome record to logs/agent.jsonl."""
-    fields["event"] = event
-    fields["ts"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    _agent_logger.info(json.dumps(fields, default=str))
+    log_json(_agent_logger, event, **fields)
 
 
 @dataclass
@@ -130,6 +119,10 @@ class ServicingSession:
     transcript: list[dict] = field(default_factory=list)
     # Anything worth handing a human: quoted options, offers made, customer intent.
     collected_context: dict = field(default_factory=dict)
+    # Stable across every turn in one customer interaction; propagated to both decision
+    # and API logs by agent.run_turn so one run can be reconstructed without transcript
+    # text or customer identifiers.
+    conversation_id: str = field(default_factory=lambda: str(uuid4()))
 
     def record(self, role: str, text: str) -> None:
         self.transcript.append({"role": role, "text": redact_text(text)})
