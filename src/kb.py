@@ -11,6 +11,9 @@ Rules enforced here rather than left to the model:
   article in the same category also matched — the model never sees the conflict.
 - Score floor: below it, return nothing; the agent says it has no policy on the
   question rather than improvising.
+- Confidence: a hit resting on a single query term is flagged `low_confidence`, so a
+  coincidental word overlap is answered as "this may not be what you asked about"
+  rather than with three confident, unrelated articles.
 - Provenance: every query logs the article ids, authority, and dates it returned.
   This is both the debugging trail for a wrong answer and, aggregated, a report of
   which help-center pages have gone stale (complaints cluster on an article id).
@@ -39,6 +42,14 @@ _STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "can", "do", "does", "for", "from",
     "how", "i", "if", "in", "is", "it", "my", "of", "on", "or", "the", "to", "was",
     "what", "when", "where", "will", "with", "you", "your",
+    # Meta-terms: words that name the *kind* of document rather than its subject. In a
+    # corpus that is entirely policy articles, "policy" carries no topical information —
+    # customers attach it to every question ("what's your X policy"). IDF can't damp it
+    # (only 4 of 30 articles use the word, so it scores as rare and discriminating), which
+    # is how "what is your pet policy" came back with three confident, unrelated articles.
+    # Same argument as the IDF fix for "return", one level up: strip the frame, keep the
+    # subject. A query left with no subject correctly retrieves nothing.
+    "policy", "policies", "rule", "rules",
 }
 
 
@@ -72,6 +83,12 @@ def _idf() -> dict[str, float]:
         for tok in a["_title_tokens"] | a["_category_tokens"] | a["_body_tokens"]:
             df[tok] = df.get(tok, 0) + 1
     return {tok: log(n / count) for tok, count in df.items()}
+
+
+def _matched(query_tokens: list[str], article: dict) -> set[str]:
+    """The distinct query terms this article actually contains."""
+    haystack = article["_title_tokens"] | article["_category_tokens"] | article["_body_tokens"]
+    return {tok for tok in query_tokens if tok in haystack}
 
 
 def _score(query_tokens: list[str], article: dict) -> float:
@@ -110,13 +127,28 @@ def search(query: str) -> list[dict]:
                if not (a["authority"] == "legacy" and a["category"] in categories_covered)]
 
     top = results[:TOP_N]
+
+    # Thin match: the whole result rests on ONE query term. Sometimes that's right ("how
+    # do I get my money back if I cancel" — only "cancel" is in our vocabulary, and the
+    # cancellation articles are the correct answer). Sometimes it's a homonym: "insurance
+    # or damage waiver" matches the Preferred late-fee *waiver* on that word alone. The
+    # two are lexically identical, so no scoring rule separates them without dropping the
+    # good one — see DECISIONS.md §2. Rather than pick a side, say which kind of match
+    # this is and let the answer be hedged accordingly.
+    hits = [{"article": a, "score": s, "low_confidence": len(_matched(query_tokens, a)) <= 1}
+            for s, a in top]
+
     log_event("kb_retrieval", query=query,
-              returned=[{"id": a["id"], "authority": a["authority"],
-                         "last_updated": a["last_updated"], "score": round(s, 2)}
-                        for s, a in top],
+              returned=[{"id": h["article"]["id"], "authority": h["article"]["authority"],
+                         "last_updated": h["article"]["last_updated"],
+                         "score": round(h["score"], 2),
+                         "low_confidence": h["low_confidence"]}
+                        for h in hits],
               suppressed=[a["id"] for s, a in scored
                           if a["authority"] == "legacy" and a["category"] in categories_covered])
 
-    return [{"id": a["id"], "title": a["title"], "authority": a["authority"],
-             "last_updated": a["last_updated"], "body": a["body"]}
-            for _, a in top]
+    return [{"id": h["article"]["id"], "title": h["article"]["title"],
+             "authority": h["article"]["authority"],
+             "last_updated": h["article"]["last_updated"], "body": h["article"]["body"],
+             "low_confidence": h["low_confidence"]}
+            for h in hits]

@@ -190,6 +190,42 @@ phrasings and pass; live conversation confirmed the agent answers 30 minutes (of
 never the legacy 2 hours, and cites `kb_fee_02` for the $29 fee rather than inventing a
 reason for it.
 
+### The score floor didn't hold the boundary it was supposed to
+
+The floor was designed to make "we have no policy on that" a computed answer rather than
+one the model has to infer. Tested against topics genuinely outside the corpus, it leaked:
+*"what is your pet policy"* returned three confident, unrelated articles.
+
+Two different causes, and only one of them has a clean fix.
+
+**Fixed — meta-terms.** "Policy" names the *kind* of document, not its subject, and in a
+corpus that is entirely policy articles it carries no information. IDF cannot damp it:
+only four of thirty articles use the word, so it scores as rare and discriminating,
+exactly backwards. It joins the stopword list alongside "rules". Strip the frame, keep the
+subject; a query left with no subject correctly retrieves nothing. This is the same
+argument as the earlier IDF fix for "return", one level up — and worth noting that the
+obvious-sounding alternatives don't work: raising the floor drops real matches, and
+requiring a title/category hit doesn't help because the false positives *were* title hits.
+
+**Not fixed, deliberately — homonyms.** *"Do you cover insurance or a damage waiver"*
+matches `kb_pref_02` ("Preferred Member Late-Fee **Waiver**") on that one word. Lexically
+it is indistinguishable from *"how do I get my money back if I cancel"*: one known token,
+three unknown, a single title hit. Any rule sharp enough to drop the first drops the
+second — and the second is a real cancellation question the agent must answer. Coverage
+ratios, distinct-token minimums, and idf floors were each checked against both queries and
+each fails this way. **The discriminator is semantic, and lexical scoring does not have
+it.** This is the honest cost of the no-embeddings decision, and it is a smaller cost than
+the wrong-authority failure that decision was made to prevent.
+
+**Mitigated instead: confidence, not a verdict.** A hit resting on a single query term is
+returned flagged `low_confidence`, and `search_policy` tells the model plainly that the
+match may be about something else and to say it has no policy if so. That helps both
+queries rather than trading one for the other — the cancellation question gets answered
+with a hedge, the waiver question gets answered with "I don't have policy on that." It
+also keeps the boundary where §3 says invented reasons belong: visible, not inferred.
+The clean fix is a semantic one, which is the strongest argument yet catalogued for
+embeddings at a corpus size where they'd otherwise be overkill.
+
 ### Testing strategy: fixtures from real payloads, never invented from scratch
 
 Several cancel-policy branches (pre-pickup cancellation, non-refundable rates, pay-at-
@@ -211,6 +247,36 @@ audit. The standing discipline going forward: **when a test patches something, a
 that the patch was actually reached**, not just that the final outcome looks right — a
 mutation check (deliberately break the guard, confirm the test then fails) is cheap
 insurance against writing a test that would pass regardless.
+
+**A stub must match the shape of the response it stands in for.** The extend stubs
+originally returned `{"success": True, "confirmation_number": "EXT-TEST"}` — no charges
+block, which no real extend response looks like. Nothing depended on the difference, so
+nothing complained, right up until post-write reconciliation needed a total to reconcile
+against and found the fixture had never had one. An abbreviated stub silently narrows
+what the suite is capable of noticing.
+
+### `xfail` records a decision, never a result
+
+A later testing pass added ten adversarial tests under a module-level
+`pytest.mark.xfail(strict=True)`, on the reasoning that a known gap should be visible in
+the suite rather than buried in a TODO. The mechanism is sound — strict mode means fixing
+a gap *fails* the build until the marker is removed, so nothing gets half-closed — but the
+module-level application was not, for a reason that generalizes: **`xfail` swallows errors
+identically to assertion failures.** Four of the ten never reached their assertion at all;
+they died in a shared helper on a fixture date that real time had since passed (the very
+floor `build_quote` grew for REVIEW_QUEUE #17), and reported as documented findings.
+Fourth instance in this build of a test that proves nothing while looking like coverage,
+and the first where the *harness* did the hiding rather than the test body.
+
+Two rules came out of it, both now in force:
+
+- **`xfail` is applied per-test, with a reason naming the decision** — never to a module.
+  A blanket marker cannot distinguish "we chose not to fix this" from "this crashed."
+- **Before an xfail is believed, it is read with `--runxfail`.** A gap is only real once
+  the failure message is the one the test set out to produce.
+
+Of the ten, six were genuine and are fixed and graduated; one was fixable in part; three
+remain deferred, each carrying the reason inline (see the end of §3).
 
 ---
 
@@ -250,6 +316,15 @@ a wall-clock proxy (e.g. "quote must be N seconds old") that a fast customer or 
 test would each trip in the wrong direction. Consequence for future work: **every write
 flow, Cancel included, must quote and charge on separate turns.** This is now a load-
 bearing constraint on the architecture, not an implementation detail.
+
+**A repriced quote re-enters the gate at the start.** `revalidate_quote` refuses the write
+and hands back the new total — but it was updating `total_charged` while leaving
+`quoted_on_turn` alone, so the refusal was advice rather than a gate. The model could call
+the write again inside the same turn and the second attempt sailed through on a turn
+boundary earned by the *old* number, charging a total the customer had never seen. Fixed
+by treating a new price as a new quote: `quoted_on_turn` resets to the current turn and
+`accepted` clears. The general lesson is that a gate keyed on state has to re-key whenever
+that state changes underneath it, or it silently starts vouching for something else.
 
 **A quote is single-use.** `PendingQuote.consumed` is set on a successful write and
 checked before the next one. Without it, a retried tool call or a replayed turn after a
@@ -335,6 +410,29 @@ agent must not choose on the customer's behalf.** A customer who says "cancel" b
 "I'm done, I'll bring it back" would be charged a one-day penalty for a word choice — a
 trust failure invisible to anyone not looking for it.
 
+**And "must not choose" has to be enforced, not requested.** As first built, this was the
+one gate in this section that lived in prose: `build_cancel_estimate` returned
+`requires_disambiguation: True` with an explanation, the instructions told the model to
+ask — and `commit_cancellation` never looked. A model that read the flag and cancelled
+anyway met every mechanical gate, because the estimate was staged and the turn had
+advanced. The section arguing hardest about this failure was the section not defending
+against it.
+
+The answer had to make the customer's choice into state the write reads, without putting
+intent classification into the money layer. `resolve_cancel_intent` takes one of two
+values and nothing else: `true_cancellation` sets `intent_confirmed`, `early_return`
+**discards the staged estimate entirely** so there is nothing left to commit. Anything
+that isn't one of the two — including a bare "yes", which is what an ambiguous reply to a
+two-option question usually produces — is refused, so the model cannot launder an unclear
+answer into a resolved one. The write refuses while the flag is set and the answer is
+absent. Consent to *this action* is now a separate structural fact from consent to *this
+price*, which is what the two-outcome branch always meant.
+
+Deliberately **not** done: bumping `quoted_on_turn` when the intent is resolved. It would
+force a third turn, and the customer who says "yes, cancel it, I understand the penalty"
+has already seen the figures and answered. The turn boundary is there to prove the numbers
+were seen; it doesn't need paying twice.
+
 ### Cancel decision tree
 
 Branch on live reservation state, never on the customer's verb.
@@ -406,6 +504,21 @@ Explicit conditions where the agent stops and escalates rather than proceeding:
 - **Repeated verification failure** — 2–3 `403 VERIFICATION_FAILED` on a write. (Note:
   the API has no email-validation read; the write itself is the check, so this is
   verify-on-first-write, not a separate validation step.)
+- **Extend charge variance** — the write's `charges.total_charged` is compared against the
+  quote the customer agreed to, and any difference in Avis's favor escalates. Cancel has
+  had this since it was built; extend went without on the assumption that a figure from
+  the API's own `/quote` would be honored by the API's own `/extend`. That was an
+  assumption, not a contract: they are separate calls, minutes apart, and nothing binds
+  them. If they disagree the confirmation gate has already been defeated — the money moved
+  — so this is remediation, same as cancel's. The threshold is tighter (one cent vs one
+  dollar) because the two mean different things: a cancel variance means an unobserved
+  policy branch, while an extend variance means the API repriced between quote and write,
+  which is a finding Avis would want reported the first time it happens.
+- **An incomplete write response** — `success: true` with no confirmation number or no
+  charges is a claim that something happened, not evidence of it. The quote is left
+  unconsumed and the session hands off. Consuming it would strand the customer in the
+  worst possible place: the retry path refuses with "already processed" while they hold no
+  confirmation number and no way to check.
 - **Cancel penalty variance** — the API has **no cancel quote** (`/quote` only accepts
   `extend`/`modify`), so the pre-confirmation penalty estimate comes from the knowledge
   base, presented explicitly as an estimate ("final amount confirmed on cancellation").
@@ -470,6 +583,50 @@ agent didn't produce safety; it produced hallucinated scope. The gates that actu
 matter (quote-before-charge, verification-before-write, turn-boundary consent) are
 enforced in code and hold regardless of how broad the agent's conversational remit is —
 so widening what it can *discuss* costs nothing the architecture depends on.
+
+### Gaps left open on purpose
+
+Three findings from the adversarial pass are not fixed. Each is a live, strict-xfail test
+carrying its reason, so the suite states the gap rather than the README claiming coverage
+that doesn't exist.
+
+**Affirmative consent cannot be read out of free text — and the money layer must not try.**
+A turn boundary proves the quote went out and the customer replied. It does not prove the
+reply meant yes; "No, do not extend it" satisfies it exactly as well as "yes please". The
+proposed fix is for `commit_extension` to detect the negation, and that is the pattern the
+whole architecture exists to prevent: the moment the gate starts interpreting natural
+language, the gate is an LLM, and it fails in the same correlated way as the model it is
+supposed to be independent of. A sarcastic yes, a mid-sentence reversal, and "sure,
+whatever" would each defeat it while making the gate look stronger on paper — the worst
+combination available.
+
+Where the mitigation actually lives, and why that split is right:
+
+| Layer | Question it answers | How |
+|---|---|---|
+| Code (`commit_extension`) | Did the customer see this exact number, on an earlier turn, once? | Structural. Cannot be talked past. |
+| Prompt | Did they say yes to *this*? | Never read a reply to a compound question as consent; re-ask alone. |
+
+The code half is worth something precisely because it makes no claim about meaning. The
+prompt half is genuinely weaker, and is stated as weaker (REVIEW_QUEUE #18) rather than
+papered over with a keyword check that would look like enforcement. What *is* enforced is
+the thing with an asymmetric downside: cancel — irreversible, one day's rate — now has
+`resolve_cancel_intent`, a two-value choice rather than a sentiment reading. That is the
+line: structural where the answer is enumerable, prompt where it is prose.
+
+**A bare CVV survives transcript redaction.** Customers answer "what's the CVV?" with
+"847". Catching that means redacting every bare three- or four-digit string from the
+transcript a human has to read — dates, totals, ZIP fragments, article counts. The right
+fix is contextual (scrub the customer turn that answers a CVV prompt), which needs a
+prompt/answer pairing `ServicingSession` doesn't model. Labelled-CVV and card-length runs
+are already scrubbed; this is the residue, and over-redacting the handoff payload would
+damage the thing the payload exists for.
+
+**Branch-local time doesn't follow DST.** The UTC offset is read off the reservation's own
+datetimes, so a June booking extended into November keeps June's offset — one hour wrong
+across the boundary. The fix needs a branch-code → IANA timezone map the payload doesn't
+carry. Worst case is a return time an hour off; no money gate depends on it, and the
+real-time floor that matters (a target date already in the past) is unaffected.
 
 ### Not hard-coding to test reservations
 
@@ -596,6 +753,17 @@ is exactly why it's flagged and shadow-logged rather than assumed.
 - [x] **Failure modes.** ~99% reliable with occasional 5xx and slow/timed-out responses,
       worst on availability and writes. Strict input validation (4xx envelope). No
       documented rate limits.
+
+      **Revisited 2026-08-06 — the status line and the body are two different claims.**
+      The client trusted `resp.ok` alone and returned the parsed body. The reference does
+      tie error envelopes to 4xx/5xx, so a `200` carrying `{"success": false}` is
+      undocumented — but "undocumented" is a statement about the docs, not about what
+      arrives on the wire at 2am, and the failure it produces is the worst shape
+      available: a declined payment read back to the customer as a confirmation number.
+      The envelope is now checked on success responses too, and a `2xx` with a non-JSON
+      body raises `MALFORMED_RESPONSE` instead of the raw `ValueError` that used to
+      escape `_request` uncaught. Both are three lines in the one layer that can catch
+      them before they become something a customer is told.
 - [x] **Email mismatch.** `403 VERIFICATION_FAILED`, distinct from
       `404 RESERVATION_NOT_FOUND` — so not-leaking-which is on the agent's wording, not
       the API. Reads are fully open (name, card last-four, plate), so the agent limits
@@ -658,6 +826,28 @@ logs are written.
 
 ## 8. Changelog
 
+- **2026-08-06** — Adversarial testing pass (external tool) produced ten strict-xfail
+  tests; **six fixed and graduated, one fixed in part, three deferred with reasons**, all
+  nine new guards mutation-verified. First finding was in the pass itself: a module-level
+  `xfail` had reported four tests as documented gaps when they were in fact crashing in a
+  shared helper on a stale fixture date — `xfail` swallows errors and assertion failures
+  identically (§2). The findings underneath were real, but nothing had demonstrated them.
+  Fixed: a repriced quote was chargeable inside the same turn because `revalidate_quote`
+  updated the total without re-keying `quoted_on_turn` (§3); the mid-rental
+  cancel/early-return disambiguation was advisory prose the write never read, now
+  `resolve_cancel_intent` with `early_return` discarding the staged estimate outright
+  (§3); extend had no post-write reconciliation against the agreed quote where cancel has
+  had one since it was built (§3); an incomplete `success: true` write was reported as a
+  completed extension and consumed the quote, stranding the customer between "already
+  processed" and no confirmation number; the client trusted HTTP status over the response
+  envelope (§5); the knowledge base returned three confident articles for "what is your
+  pet policy" (§2); and `escalate_to_human`'s model-visible docstring still listed cancel
+  as an action the agent must not take, three commits after Cancel shipped. Deferred, each
+  with the reason attached to a live test: affirmative-consent detection (intent
+  classification does not belong in the money layer), bare-CVV redaction, and DST-aware
+  branch time. Also found that the extend stubs had never carried a charges block, so the
+  suite could not have noticed a reconciliation gap — a stub must match the shape of the
+  response it replaces (§2). 85 tests green, 4 deferred; client re-verified live.
 - **2026-08-06** — Built Cancel (`src/policy.py`, `src/cancel_flow.py`), to the design in
   §3 with no deviations. The estimator is pure computation citing `kb_can_01` — no API
   call, nothing to time out — and the previously-unexecutable policy branches (pre-pickup

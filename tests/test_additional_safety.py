@@ -1,10 +1,14 @@
 """Adversarial regression tests for safety claims not covered by the original suite.
 
-These tests intentionally assert the customer/revenue protections described in BRIEF.md
-and DECISIONS.md. A failure means the current implementation does not structurally enforce
-that protection; it is not a flaky live-LLM evaluation.
+These tests assert the customer/revenue protections described in BRIEF.md and
+DECISIONS.md. A failure means the implementation does not structurally enforce that
+protection; it is not a flaky live-LLM evaluation.
 
-Run: python tests/test_additional_safety.py
+Most started life as xfails from an external testing pass and have since been fixed and
+graduated. What remains marked `@deferred` is a gap we decided not to close, with the
+reason attached — strict mode means fixing one fails the suite until the marker goes.
+
+Run: python -m pytest tests/test_additional_safety.py
 """
 from __future__ import annotations
 
@@ -25,18 +29,19 @@ import config  # noqa: E402
 import extend_flow  # noqa: E402
 import kb  # noqa: E402
 from avis_client import AvisAPIError  # noqa: E402
-from fixtures import FakeResponse, error_body, fake_transport, reservation  # noqa: E402
+from fixtures import (  # noqa: E402
+    EXTEND_TEST_NOW, FakeResponse, error_body, fake_transport, reservation,
+)
 from session import ServicingSession, redact_text  # noqa: E402
 
 
-# These encode desired production safeguards that the current implementation does not yet
-# provide. Strict xfail keeps the canonical suite honest and green while making every known
-# gap visible; once a safeguard is implemented, its XPASS fails the suite until this marker
-# is removed and the test graduates into the normal regression set.
-pytestmark = pytest.mark.xfail(
-    reason="known safety gap documented by the additional-testing audit",
-    strict=True,
-)
+# Strict xfail marks a gap we have decided NOT to close, with the reason attached. It is
+# applied per-test, never to the module: a module-level marker also swallows *errors*, so a
+# test that crashes before reaching its assertion reports as a documented gap while proving
+# nothing. That is exactly what happened on the first pass here — four tests died in
+# `_stage_quote` on a stale fixture date and were read as findings (DECISIONS.md §2).
+def deferred(reason: str):
+    return pytest.mark.xfail(reason=reason, strict=True)
 
 
 QUOTE = {"success": True, "quote": {"charges": {
@@ -64,13 +69,21 @@ def _stage_quote(session: ServicingSession, quote: dict = QUOTE) -> None:
     config.FLEXIBLE_DATE_ALTERNATIVES_MODE = "off"
     try:
         session.turn = 1
-        extend_flow.build_quote(session, "2026-06-17")
+        # Pinned `now`, per the fixtures convention: the captured payload's dates are in
+        # 2026-06, which real wall-clock time has since passed, and build_quote's
+        # real-time floor (REVIEW_QUEUE #17) correctly rejects them.
+        extend_flow.build_quote(session, "2026-06-17", now=EXTEND_TEST_NOW)
         session.turn = 2
     finally:
         extend_flow.quote_change = original
         config.FLEXIBLE_DATE_ALTERNATIVES_MODE = original_mode
 
 
+@deferred(
+    "DELIBERATE: reading 'no' out of free text is intent classification, and putting that "
+    "in the money layer is the LLM-touching-money pattern the architecture exists to "
+    "prevent. Answered in DECISIONS.md §3 rather than implemented."
+)
 def test_later_turn_without_affirmative_consent_cannot_extend():
     """A turn boundary proves the quote was visible, not that the answer was yes."""
     session = _session()
@@ -222,11 +235,22 @@ def test_incomplete_extension_success_is_not_consumed():
     assert session.pending_quote.consumed is False, "incomplete write consumed the quote"
 
 
+@deferred(
+    "DELIBERATE: satisfying this means redacting every bare 3-4 digit string — dates, "
+    "totals, ZIP fragments — from the transcript a human needs to read. The contextual "
+    "fix (scrub the turn following a CVV prompt) needs a prompt/answer pairing the "
+    "session does not model yet. DECISIONS.md §3."
+)
 def test_bare_cvv_is_scrubbed_from_handoff_transcript():
     """Customers commonly answer a CVV prompt with only the digits."""
     assert "847" not in redact_text("847"), "a bare CVV survives transcript redaction"
 
 
+@deferred(
+    "DELIBERATE: needs a branch-code -> IANA timezone map the reservation payload does "
+    "not carry. Worst case is a one-hour error across a DST boundary; no money gate "
+    "depends on it. DECISIONS.md §5, timezones."
+)
 def test_branch_local_time_uses_target_dates_dst_offset():
     """ORD is UTC-5 in June but UTC-6 in November; wall time must remain Chicago-local."""
     session = _session()
@@ -241,30 +265,35 @@ def test_handoff_tool_does_not_say_supported_cancel_is_forbidden():
     assert "must not take (cancel" not in description, description
 
 
-def test_uncovered_policy_queries_do_not_return_unrelated_articles():
+def test_uncovered_topic_framed_as_a_policy_question_returns_nothing():
     """A deterministic false positive leaves the model to invent the safety boundary."""
-    for query in (
-        "do you cover insurance or a damage waiver",
-        "what is your pet policy",
-    ):
-        results = kb.search(query)
-        assert results == [], f"{query!r} returned unrelated articles: {[r['id'] for r in results]}"
+    query = "what is your pet policy"
+    results = kb.search(query)
+    assert results == [], f"{query!r} returned unrelated articles: {[r['id'] for r in results]}"
+
+
+@deferred(
+    "DELIBERATE: lexically indistinguishable from a legitimate query. 'insurance or "
+    "damage waiver' (1 known token, 3 unknown, single title hit) has the identical shape "
+    "to 'how do I get my money back if I cancel' — any rule that drops the first drops "
+    "the second. Mitigated instead by low_confidence on thin matches. DECISIONS.md §2."
+)
+def test_uncovered_topic_sharing_a_word_with_an_article_title_returns_nothing():
+    query = "do you cover insurance or a damage waiver"
+    results = kb.search(query)
+    assert results == [], f"{query!r} returned unrelated articles: {[r['id'] for r in results]}"
+
+
+def test_thin_single_token_matches_are_flagged_low_confidence():
+    """What the deferred case above is mitigated with: say so instead of silently guessing."""
+    hits = kb.search("do you cover insurance or a damage waiver")
+    assert hits, "expected the thin match to still be returned, flagged"
+    assert all(h["low_confidence"] for h in hits), hits
+    assert not any(h["low_confidence"] for h in kb.search("grace period late return"))
 
 
 if __name__ == "__main__":
-    failures = 0
-    tests = sorted(
-        (name, fn) for name, fn in globals().items() if name.startswith("test_")
-    )
-    for name, fn in tests:
-        try:
-            fn()
-            print(f"  PASS  {name}")
-        except AssertionError as exc:
-            failures += 1
-            print(f"  FAIL  {name}: {exc}")
-        except Exception as exc:  # make unexpected crashes visible without hiding later tests
-            failures += 1
-            print(f"  ERROR {name}: {type(exc).__name__}: {exc}")
-    print(f"\n{'ALL PASS' if failures == 0 else f'{failures} FAILURE(S)'}")
-    sys.exit(1 if failures else 0)
+    # No bare runner here, unlike the older test files: the deferred cases carry pytest
+    # markers, and a hand-rolled loop would report a documented, deliberate gap as a
+    # failure. Run this file through pytest.
+    raise SystemExit("Run with: python -m pytest tests/test_additional_safety.py")

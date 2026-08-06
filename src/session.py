@@ -95,6 +95,13 @@ class PendingCancellation:
     quoted_on_turn: int = 0
     consumed: bool = False
     quoted_at: float = field(default_factory=time.monotonic)
+    # Mid-rental, "cancel" is ambiguous between a true cancellation (one day's rate) and
+    # an early return (free) — DECISIONS.md §3. When requires_disambiguation is set, the
+    # write refuses until intent_confirmed says the customer was asked and chose. Carried
+    # on the staged estimate rather than recomputed, so the answer belongs to the specific
+    # figures the customer was shown.
+    requires_disambiguation: bool = False
+    intent_confirmed: bool = False
 
 
 @dataclass

@@ -23,6 +23,12 @@ QUOTE = {"success": True, "quote": {"charges": {
     "daily_rate": 38.99, "extension_days": 3, "subtotal": 116.97, "late_fee": 29.0,
     "one_way_fee": 0.0, "taxes_and_fees": 13.5, "total_charged": 159.47, "currency": "USD"}}}
 
+# Mirrors the documented extend response shape (confirmation number + extension details +
+# charges), not the abbreviated stub this file started with.
+WRITE_OK = {"success": True, "confirmation_number": "EXT-TEST",
+            "extension_details": {"extension_days": 3, "late_return": True},
+            "charges": QUOTE["quote"]["charges"]}
+
 
 class Ctx:
     def __init__(self, session):
@@ -32,8 +38,7 @@ class Ctx:
 def _stub_client(quote=None, write=None):
     orig = (extend_flow.quote_change, extend_flow.extend_reservation)
     extend_flow.quote_change = quote or (lambda *a, **k: QUOTE)
-    extend_flow.extend_reservation = write or (
-        lambda *a, **k: {"success": True, "confirmation_number": "EXT-TEST"})
+    extend_flow.extend_reservation = write or (lambda *a, **k: WRITE_OK)
     return lambda: (setattr(extend_flow, "quote_change", orig[0]),
                     setattr(extend_flow, "extend_reservation", orig[1]))
 
@@ -106,8 +111,7 @@ def test_quote_cannot_be_charged_twice():
     """Each write mints a fresh idempotency key, so the API's replay protection does not
     cover a repeated tool call — only refusing here does."""
     writes = []
-    restore = _stub_client(write=lambda *a, **k: (
-        writes.append(1), {"success": True, "confirmation_number": "EXT-TEST"})[1])
+    restore = _stub_client(write=lambda *a, **k: (writes.append(1), WRITE_OK)[1])
     try:
         session = _staged(_session())
         first = extend_flow.commit_extension(session, "marcus.lee@example.com", "123", "60601")

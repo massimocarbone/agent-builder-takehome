@@ -159,6 +159,27 @@ def estimate_cancellation(ctx: RunContextWrapper[ServicingSession]) -> dict:
 
 
 @function_tool
+def resolve_cancel_intent(ctx: RunContextWrapper[ServicingSession], intent: str) -> dict:
+    """Record what a mid-rental customer meant by "cancel", after you have asked them.
+
+    Required before confirm_cancellation whenever estimate_cancellation returned
+    requires_disambiguation — the cancellation is blocked until this is recorded.
+
+    intent="true_cancellation" — they want the reservation cancelled knowing the penalty
+    applies and the vehicle still has to be returned.
+    intent="early_return" — they just mean they're done with the car. Nothing is
+    cancelled, nothing is charged for the change, and they return it to the branch.
+
+    Only call this after they have actually answered. If their reply was ambiguous, or
+    answered some other part of your message, ask again instead of picking one.
+    """
+    session = ctx.context
+    if blocked := _blocked(session):
+        return blocked
+    return cancel_flow.resolve_cancel_intent(session, intent.strip().lower())
+
+
+@function_tool
 def confirm_cancellation(ctx: RunContextWrapper[ServicingSession], email: str,
                          reason: str = "") -> dict:
     """Cancel the reservation the customer just agreed to cancel.
@@ -184,6 +205,11 @@ def search_policy(query: str) -> dict:
     articles, say you don't have policy on that and offer a representative — do not
     guess. Never use an article to compute a price; prices come from quote tools only.
 
+    If an article comes back with low_confidence, it matched on a single word and may be
+    about something else entirely. Only use it if it genuinely answers what was asked;
+    otherwise say you don't have policy on that topic. Never stretch a near-miss article
+    to cover a question it doesn't address.
+
     Deliberately NOT blocked after a handoff: a customer waiting on a representative may
     still ask "how long do refunds take?", and answering general published policy neither
     touches their booking nor reveals anything about it. Everything that reads or changes
@@ -193,6 +219,11 @@ def search_policy(query: str) -> dict:
     if not results:
         return {"ok": True, "articles": [],
                 "note": "No policy found. Say so and offer a representative; do not improvise."}
+    if all(r["low_confidence"] for r in results):
+        return {"ok": True, "articles": results,
+                "note": "Every match here rests on a single shared word and may be about "
+                        "a different topic. Check each one actually answers the question; "
+                        "if none does, say you have no policy on it."}
     return {"ok": True, "articles": results}
 
 
@@ -202,9 +233,11 @@ def escalate_to_human(ctx: RunContextWrapper[ServicingSession], reason: str,
                       kind: str = "hard") -> dict:
     """Hand off to a human agent, passing along everything collected so far.
 
-    kind="hard" — a real transfer. Use for actions this agent must not take (cancel,
-    membership upgrade, location change), repeated verification failure, or an error that
-    re-collecting input won't fix. After this you stop working the request entirely.
+    kind="hard" — a real transfer. Use for actions this agent must not take (Avis
+    Preferred membership upgrades, return-location or vehicle-class changes), repeated
+    verification failure, or an error that re-collecting input won't fix. After this you
+    stop working the request entirely. Extending and cancelling are things you DO handle —
+    never escalate those merely because they are changes.
 
     kind="assistive" — you're pulling a person in to help with something you can't do,
     but the customer may still resolve it themselves (e.g. they can't find their
@@ -294,9 +327,10 @@ CANCELLING, in order:
 2. If it says requires_disambiguation, the customer HAS the car. "Cancel" mid-rental
    usually means "I'm done with it" — which is an early return: no fee, charges follow
    the time actually rented, and it happens at the branch counter, not here. Explain both
-   options with their costs and ask which they mean. If they mean early return, tell them
-   to return the car and do NOT cancel anything. Only proceed if they clearly want a true
-   cancellation, knowing the penalty AND that the car must still be returned.
+   options with their costs and ask which they mean. When they answer, record it with
+   resolve_cancel_intent — confirm_cancellation stays blocked until you do, and passing
+   "early_return" clears the cancellation so nothing can be processed by mistake.
+   Never call resolve_cancel_intent to describe your own reading of an unclear reply.
 3. Present the figures as an ESTIMATE — say the exact word "estimate" and that the final
    amount is confirmed at cancellation. Never call it a quote.
 4. Get explicit agreement to those figures, then ask for the email on file (cancellation
@@ -375,8 +409,8 @@ servicing_agent = Agent[ServicingSession](
     model=config.AGENT_MODEL,
     instructions=build_instructions,
     tools=[lookup_reservation, quote_extension, confirm_extension,
-           estimate_cancellation, confirm_cancellation, search_policy,
-           escalate_to_human],
+           estimate_cancellation, resolve_cancel_intent, confirm_cancellation,
+           search_policy, escalate_to_human],
 )
 
 
