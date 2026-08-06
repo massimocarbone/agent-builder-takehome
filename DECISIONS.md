@@ -502,6 +502,45 @@ This machinery is kept on `codex/test-run-artifacts` as a standalone, low-risk l
 The generative suites build on top of it but are not required to get isolated evidence
 from ordinary deterministic tests.
 
+### Generative testing explores boundaries and sequences, not invented product behavior
+
+Named examples remain the clearest executable specification: "exactly 48 hours uses the
+penalty branch" is easier to defend than a generated timestamp with no story attached.
+Their weakness is combinatorics. Payload omissions, nearby datetimes, retry prefixes,
+money values, and action orderings multiply faster than handwritten cases can cover.
+Hypothesis is added as a complement, not a replacement.
+
+The property strategies preserve the real-fixture rule above. They begin with captured
+reservation shapes and vary only the field relevant to the property. The assertions are
+business invariants rather than snapshots: required fields always fail closed; targets at
+or before the current return never quote; cancellation penalty plus refund conserves the
+prepaid amount; transient retries stay bounded and reuse one idempotency key; terminal
+client errors stop immediately. Explicit examples pin the meaningful edges (48 hours,
+zero hours, one cent around a variance threshold) while generated examples explore the
+space between them.
+
+The rule-based state machine covers the other dimension: valid operations in hostile
+orders. It interleaves reservation loads and switches, turn advancement, quotes,
+repricing, confirmations, cancellation estimates and disambiguation, retries, early
+return, and hard handoff. Always-on invariants assert that no write occurs on the quote's
+turn, one staged object authorizes at most one write, switching reservations clears
+reservation-scoped authority, early-return resolution leaves nothing cancellable, and a
+terminal handoff never reopens. The HTTP and LLM boundaries remain deterministic stubs;
+the machine exercises the real session and flow gates, not provider availability.
+
+Both suites are deliberately bounded for a take-home (`30` property examples; `35`
+state-machine examples × `25` steps) and make no live API or model calls. A seed can be
+recorded for exact reproduction, while Hypothesis still shrinks a failing generated case
+to the smallest useful sequence. This is broader confidence, not formal verification:
+the strategy only finds cases inside the model we wrote, and the live librarian quality
+eval remains a separate probabilistic measurement.
+
+The branch boundary is part of the risk decision. `codex/test-run-artifacts` can ship on
+its own; `codex/test-harness-experiments` adds Hypothesis and the generative suites above
+it. Developers can run either file, a `-k` slice, or the ordinary deterministic suite
+through the same artifact wrapper. We only roll the experimental layer into the final
+deliverable if its maintenance cost and failures remain intelligible rather than noisy.
+
 ### `xfail` records a decision, never a result
 
 A later testing pass added ten adversarial tests under a module-level
