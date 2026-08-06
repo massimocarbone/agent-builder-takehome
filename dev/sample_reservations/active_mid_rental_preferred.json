@@ -1,0 +1,40 @@
+{
+  "reservation_id": "AVS-90000002",
+  "customer_id": "CUST-900002",
+  "customer_name": "Priya Nair",
+  "membership_status": "avis_preferred",
+  "vehicle": {
+    "type": "suv",
+    "description": "Toyota Highlander or similar",
+    "make_model": "2025 Toyota Highlander",
+    "color": "Black",
+    "license_plate": "3LMN456"
+  },
+  "pickup_location": {
+    "code": "ORD",
+    "name": "O'Hare International Airport",
+    "address": "10000 W Balmoral Ave, Chicago, IL 60666"
+  },
+  "return_location": {
+    "code": "ORD",
+    "name": "O'Hare International Airport",
+    "address": "10000 W Balmoral Ave, Chicago, IL 60666"
+  },
+  "dates": {
+    "pickup_datetime": "2026-08-05T17:49:04-05:00",
+    "current_return_datetime": "2026-08-10T17:49:04-05:00",
+    "original_return_datetime": "2026-08-10T17:49:04-05:00"
+  },
+  "pricing": {
+    "daily_rate": 64.99,
+    "currency": "USD"
+  },
+  "payment": {
+    "card_on_file": {
+      "type": "Mastercard",
+      "last_four": "1190"
+    },
+    "total_charged": 324.95
+  },
+  "status": "active"
+}
