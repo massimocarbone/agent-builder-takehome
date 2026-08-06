@@ -121,6 +121,21 @@ run summary also scans the structured JSONL artifacts for obvious raw email/card
 patterns and returns a non-zero status if it finds one. Treat this as a guardrail, not a
 replacement for access control or a dedicated secret scanner.
 
+### Generative safety tests
+
+Hypothesis broadens the deterministic safety suite beyond the named examples:
+
+```bash
+python -m pytest tests/test_properties.py tests/test_state_machine.py
+```
+
+The property tests minimally mutate captured reservation fixtures around validation,
+datetime, pricing, cancellation, retry, and idempotency boundaries. The rule-based state
+machine explores interleaved reservation switches, quotes, confirmations, repricing,
+cancellation disambiguation, and hard handoffs. Both use bounded local settings and
+scripted transports, so they do not call the live Avis API or an LLM. To reproduce an
+exact stateful run, pass a seed such as `--hypothesis-seed=20260806`.
+
 ## Then build
 
 Head to [`BRIEF.md`](BRIEF.md). Build the RAG foundation and escalation logic first, then
