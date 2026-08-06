@@ -82,6 +82,46 @@ issues: no client-side format validation, and the agent then *told the customer*
 system had accepted an invalid value — an unnecessary disclosure about payment-validation
 weakness.
 
+### 10. `SCORE_FLOOR` is documented as a safety boundary; it isn't one
+**Where:** `src/kb.py` — the module docstring and the comment above `SCORE_FLOOR`.
+
+Both claim the floor is where "the agent says it has no policy rather than improvising."
+Measured, that is false: **in-domain and out-of-domain score ranges overlap**, so no
+threshold separates them.
+
+| | query | top score |
+|---|---|---|
+| lowest legitimate | "what is the grace period" | **2.81** |
+| highest false positive | "do you cover insurance or a damage waiver" | **8.12** |
+
+The false positive wins because "waiver" is rare, so IDF weights it heavily, and it sits
+in the *title* of `kb_pref_02` ("Preferred Member Late-Fee Waiver"). Semantically
+unrelated, lexically a strong match — and IDF makes this class of failure worse, not
+better, since rare-word collisions score highest. Same shape: "is there a pet **policy**"
+→ "No-Show **Policy**" at 6.04. Requiring a title/category match doesn't help; both false
+positives match on title.
+
+`1.0` is a fine value — in-domain top hits run 2.81–12.49, so anything below ~2.5 never
+blocks a real answer, and what it actually prunes is the incidental tail (e.g. a
+third-place hit at 0.92). **The fix is the wording, not the number.** Restate the floor as
+noise-pruning within a result set, and document that the real knowledge boundary is the
+model's relevance judgment over article titles — which is the right place for it, since
+"does this article address the question" is a language judgment, not a money decision.
+
+Verified in practice: asked about insurance and pet policy, the agent declined both and
+said it had no article on pets. The mechanism works; only the comment is wrong.
+
+### 11. `test_nonsense_returns_nothing` gives false confidence
+**Where:** `tests/test_kb.py`.
+
+"purple elephant cryptocurrency" scores 0 because none of those words appear anywhere in
+the corpus — the test passes with *any* floor, including 0.0001. It exercises nothing.
+
+Replace with the plausible-but-uncovered queries that actually probe the boundary:
+insurance / damage waiver, pet policy, roadside assistance, child seat, holiday hours.
+Because retrieval *will* return something for these (see item 10), the meaningful
+assertion is at the **agent** level — that it declines — not at the retrieval level.
+
 ---
 
 ### 1. Agent volunteers the remaining verification-attempt count
