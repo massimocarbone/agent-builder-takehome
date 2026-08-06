@@ -630,6 +630,19 @@ logs are written.
 
 ## 8. Changelog
 
+- **2026-08-06** — Built Cancel (`src/policy.py`, `src/cancel_flow.py`), to the design in
+  §3 with no deviations. The estimator is pure computation citing `kb_can_01` — no API
+  call, nothing to time out — and the previously-unexecutable policy branches (pre-pickup
+  >48h/≤48h, pay-at-counter, penalty capped at prepaid) ran for the first time under the
+  fixture harness. Confirmation inherits every gate from Extend: staged estimate, turn
+  boundary, single-use, verification lockout, `handed_off` blocking. The variance check is
+  asymmetric per the §3 decision: adverse beyond $1 escalates as remediation (the write
+  has already happened), favorable is reported as good news without burning a handoff.
+  Verified live end-to-end: mid-rental "cancel" triggered disambiguation and an early
+  return was answered from `kb_can_04` with nothing cancelled; an explicit cancellation
+  completed with the estimate matching the actual to the cent. Retention prompt
+  shadow-logs; three new gates mutation-verified; queue items #5 (bot identity in the
+  greeting) and #6 (early-return answer) closed as side effects. 80+ tests, 7 files, green.
 - **2026-08-06** — External audit against `main` (post-handoff-fix) found nine issues,
   independently reproduced before fixing, each with a regression test; the four new
   guards are mutation-verified. Highest severity: switching reservations mid-conversation

@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from agents import Agent, RunContextWrapper, Runner, SQLiteSession, function_tool  # noqa: E402
 
+import cancel_flow  # noqa: E402
 import config  # noqa: E402
 import extend_flow  # noqa: E402
 import kb  # noqa: E402
@@ -135,6 +136,44 @@ def confirm_extension(ctx: RunContextWrapper[ServicingSession], email: str, cvv:
 
 
 @function_tool
+def estimate_cancellation(ctx: RunContextWrapper[ServicingSession]) -> dict:
+    """Estimate the penalty and refund for cancelling the loaded reservation.
+
+    Call this when a customer wants to cancel, BEFORE asking them to confirm anything.
+    Returns policy-based ESTIMATES — always present them as estimates, with the caveat
+    that the final amount is confirmed at cancellation. If the result includes
+    requires_disambiguation, the customer has the car: ask whether they mean a true
+    cancellation (penalty applies, car still must be returned) or an early return
+    (no fee, handled at the counter, nothing to process here) before going further.
+    """
+    session = ctx.context
+    if blocked := _blocked(session):
+        return blocked
+    try:
+        return {"ok": True, **cancel_flow.build_cancel_estimate(session)}
+    except extend_flow.FlowError as exc:
+        return {"ok": False, "customer_message": str(exc)}
+    except AvisAPIError as exc:
+        return extend_flow.classify_failure(session, exc, "estimate_cancellation")
+
+
+@function_tool
+def confirm_cancellation(ctx: RunContextWrapper[ServicingSession], email: str,
+                         reason: str = "") -> dict:
+    """Cancel the reservation the customer just agreed to cancel.
+
+    Only call after estimate_cancellation has run, the customer has seen the estimated
+    penalty and refund, explicitly agreed, and given the email on file. Pass their stated
+    reason if they offered one. The result contains the ACTUAL penalty and refund — if it
+    flags escalate, the outcome differed from the estimate in the customer's disfavor:
+    state both numbers plainly and hand off.
+    """
+    if blocked := _blocked(ctx.context):
+        return blocked
+    return cancel_flow.commit_cancellation(ctx.context, email, reason=reason or None)
+
+
+@function_tool
 def search_policy(query: str) -> dict:
     """Search Avis policy articles for questions about rules, fees, grace periods,
     refund timing, membership benefits, and similar. Returns the most relevant articles
@@ -216,7 +255,8 @@ they're talking to a person, and don't pretend otherwise.
 You help customers with an existing rental. You can:
 - look up a reservation and answer questions about it
 - answer policy questions from the Avis knowledge base
-- EXTEND a rental — push out the return date/time. This is the only change you make.
+- EXTEND a rental — push out the return date/time
+- CANCEL a reservation — with the customer's informed, explicit agreement
 
 WHAT YOU MAY TELL A CALLER
 Once you have looked a reservation up, you may freely share: the vehicle, the pickup and
@@ -242,6 +282,26 @@ EXTENDING, in order:
    CVV and billing ZIP — all three are required to authorize the charge.
 5. Confirm the extension and give them the confirmation number.
 
+CANCELLING, in order:
+1. Look up the reservation, then call estimate_cancellation.
+2. If it says requires_disambiguation, the customer HAS the car. "Cancel" mid-rental
+   usually means "I'm done with it" — which is an early return: no fee, charges follow
+   the time actually rented, and it happens at the branch counter, not here. Explain both
+   options with their costs and ask which they mean. If they mean early return, tell them
+   to return the car and do NOT cancel anything. Only proceed if they clearly want a true
+   cancellation, knowing the penalty AND that the car must still be returned.
+3. Present the figures as an ESTIMATE — say the exact word "estimate" and that the final
+   amount is confirmed at cancellation. Never call it a quote.
+4. Get explicit agreement to those figures, then ask for the email on file (cancellation
+   needs no card details).
+5. Confirm the cancellation. Give the confirmation number, the ACTUAL penalty and refund,
+   and the refund timing. If the result says escalate, the outcome was worse than the
+   estimate: state both numbers plainly, apologize once, say a representative will review
+   and make it right, and stop.
+Cancellation is irreversible — never call confirm_cancellation on an ambiguous request,
+and never rush a hesitating customer. If they change their mind at any point, drop it
+immediately and confirm nothing was cancelled.
+
 RULES YOU DO NOT BEND
 - Never charge anything the customer has not seen and agreed to. If a tool says the price
   changed, show the new total and get agreement again.
@@ -259,9 +319,9 @@ RULES YOU DO NOT BEND
   source for the price of this customer's change — only quotes are.
 
 WHAT YOU HAND OFF
-- Actions you cannot take: cancelling, changing the return location or vehicle class, and
-  Avis Preferred membership upgrades. Say so directly — don't imply you might manage it —
-  and escalate with kind="hard".
+- Actions you cannot take: changing the return location or vehicle class, and Avis
+  Preferred membership upgrades. Say so directly — don't imply you might manage it — and
+  escalate with kind="hard".
 - If a customer wants a membership upgrade, you never process it. Escalate so a
   representative can finalize the upgrade and any pending extension together.
 - Use kind="assistive" when you're bringing in help but the customer might still resolve
@@ -279,10 +339,11 @@ Be warm and brief. This is a phone-style conversation, not a form.
 """
 
 servicing_agent = Agent[ServicingSession](
-    name="Avis Extend Specialist",
+    name="Avis Servicing Agent",
     model=config.AGENT_MODEL,
     instructions=INSTRUCTIONS,
-    tools=[lookup_reservation, quote_extension, confirm_extension, search_policy,
+    tools=[lookup_reservation, quote_extension, confirm_extension,
+           estimate_cancellation, confirm_cancellation, search_policy,
            escalate_to_human],
 )
 
@@ -326,8 +387,9 @@ def main() -> None:
     servicing_session = ServicingSession()
     history = SQLiteSession(f"avis-cli-{uuid.uuid4()}")
 
-    print("Avis servicing agent — extend an existing rental. Ctrl-C or 'quit' to exit.\n")
-    print("Agent: Hi, this is Avis support. Do you have your reservation number handy?")
+    print("Avis servicing agent — extend or cancel an existing rental. Ctrl-C or 'quit' to exit.\n")
+    print("Agent: Hi! I'm Avis's automated assistant — I can help extend or cancel a "
+          "reservation, or answer questions about one. Do you have your reservation number handy?")
 
     while True:
         try:

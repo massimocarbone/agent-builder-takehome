@@ -38,18 +38,6 @@ short/negative turns, no state change across N turns, profanity, or explicit
 frustration. This is a cheap, high-value addition and it belongs in code next to the
 other triggers, not in the prompt.
 
-### 5. Bot identity not disclosed until challenged
-The customer asked *"youre not a real person???"* partway through. Beyond the trust cost,
-disclosure is a legal requirement in some jurisdictions (e.g. California's B.O.T. Act).
-The opening line should identify the agent as automated.
-
-### 6. Early-return question answered with an escalation instead of the policy
-*"can i just return it now?? i dont need it anymore"* — this is precisely the
-early-return-vs-cancel case in DECISIONS.md §3. The agent said it couldn't help and
-offered a representative, without searching. `kb_can_04` has the useful answer: **no fee
-to return early**, charges follow actual rental time, with some rate plans not refunding
-unused days. A good answer here saves the handoff entirely.
-
 ### 7. Customer name disclosed before verification
 The agent signed off "Have a great day, Marcus" with no email verification. Reads are open
 API-side, so anyone holding a reservation ID can obtain the name — but the agent
@@ -111,7 +99,19 @@ assertion is at the **agent** level — that it declines — not at the retrieva
 
 ---
 
+---
+
 ## Cleared
+
+### 5. Bot identity not disclosed until challenged — FIXED
+The CLI greeting now opens with "I'm Avis's automated assistant", and the instructions
+already required disclosure on being asked. Verified in the live cancel E2E runs.
+
+### 6. Early-return question escalated instead of answered — FIXED
+Fixed by design in the Cancel build: `estimate_cancellation` flags in-rental reservations
+with `requires_disambiguation` and carries the early-return alternative (kb_can_04: no
+fee, charges follow actual time, handled at the counter). Verified live — "i just dont
+need the car anymore" got the correct answer, nothing was cancelled, no escalation.
 
 ### 14. Card last-four disclosed to an unverified caller — FIXED
 Found during the 2026-08-05 bug sweep. Asked to extend, the agent replied *"I'll charge
