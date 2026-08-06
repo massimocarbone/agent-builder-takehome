@@ -29,6 +29,7 @@ import cancel_flow  # noqa: E402
 import config  # noqa: E402
 import extend_flow  # noqa: E402
 import kb  # noqa: E402
+import librarian  # noqa: E402
 import avis_client  # noqa: E402
 from avis_client import AvisAPIError  # noqa: E402
 from session import ServicingSession, log_event  # noqa: E402
@@ -215,8 +216,18 @@ def search_policy(query: str) -> dict:
     touches their booking nor reveals anything about it. Everything that reads or changes
     the reservation stays blocked.
     """
-    results = kb.search(query)
+    # Mode-dispatched (KB_RETRIEVAL_MODE): lexical scoring by default, optionally with
+    # the librarian producer in shadow or serving. librarian.retrieve never raises —
+    # load-bearing here, because an exception escaping a tool would trip run_turn's
+    # outer provider-retry and re-run tool calls that already succeeded.
+    retrieval = librarian.retrieve(query)
+    results = retrieval["articles"]
     if not results:
+        if retrieval["no_coverage"]:
+            return {"ok": True, "articles": [],
+                    "note": "This topic is outside what Avis publishes policy on — not "
+                            "merely missing from search. Say it isn't something this "
+                            "service covers; do not improvise or stretch another article."}
         return {"ok": True, "articles": [],
                 "note": "No policy found. Say so and offer a representative; do not improvise."}
     if all(r["low_confidence"] for r in results):

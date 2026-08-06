@@ -33,6 +33,14 @@ IN_FLOW_UPGRADE_OFFER = _flag("IN_FLOW_UPGRADE_OFFER", False)
 # Offer a date change once before processing a cancellation.
 CANCEL_RETENTION_PROMPT = _flag("CANCEL_RETENTION_PROMPT", False)
 
+# Knowledge-base retrieval mode (DECISIONS.md §2, librarian). Three modes for the same
+# reason FLEXIBLE_DATE_ALTERNATIVES_MODE has three — the counterfactual costs a real
+# LLM call, so shadow is a deliberate spend, not a free log line:
+#   lexical   — deterministic scoring only (default; the graded configuration)
+#   shadow    — librarian runs and is logged against lexical; lexical is served
+#   librarian — librarian serves, falling back to lexical on ANY failure
+KB_RETRIEVAL_MODE = os.environ.get("KB_RETRIEVAL_MODE", "lexical").strip().lower()
+
 
 # --- Tunables ----------------------------------------------------------------------
 
@@ -72,3 +80,13 @@ MAX_VERIFICATION_ATTEMPTS = int(os.environ.get("MAX_VERIFICATION_ATTEMPTS", "3")
 LATE_RETURN_FEE_USD = 29.00
 
 AGENT_MODEL = os.environ.get("AGENT_MODEL", "gpt-4.1")
+
+# The librarian is a single classification call over a ~1,600-token prompt — a cheap,
+# fast model is the right size, and it is deliberately its own knob rather than
+# AGENT_MODEL: the two calls have different jobs and different cost profiles.
+KB_LIBRARIAN_MODEL = os.environ.get("KB_LIBRARIAN_MODEL", "gpt-4.1-mini")
+
+# Hard wall-clock ceiling on the librarian call, after which lexical serves instead.
+# Same spirit as ALTERNATIVE_QUOTE_BUDGET_S: an optional nicety must never make the
+# customer wait on it.
+KB_LIBRARIAN_TIMEOUT_S = float(os.environ.get("KB_LIBRARIAN_TIMEOUT_S", "3"))

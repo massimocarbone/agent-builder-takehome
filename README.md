@@ -77,6 +77,27 @@ python -m pytest tests/test_cancel_flow.py
 python -m pytest -k cancellation
 ```
 
+## Knowledge-base retrieval modes
+
+Policy retrieval is deterministic lexical scoring by default. `KB_RETRIEVAL_MODE`
+(env var, see [DECISIONS.md](DECISIONS.md) §2 and the §4 flag table) selects the
+candidate producer:
+
+- `lexical` *(default)* — deterministic scoring only; no model call on the policy path.
+- `shadow` — the librarian classification call also runs and every attempt (including
+  failures) is logged to `logs/agent.jsonl` as `kb_retrieval_comparison`; lexical is
+  still what the customer gets. This is the data-gathering mode.
+- `librarian` — the librarian serves, falling back to lexical on any failure. Its picks
+  still pass the same deterministic finalizer (authority suppression, verbatim corpus
+  content), so it proposes articles but never adjudicates authority or invents text.
+
+The librarian's retrieval quality is measured by a scored eval that pytest deliberately
+does not collect (quality is probabilistic; it must not gate the build):
+
+```bash
+python tests/eval_librarian.py
+```
+
 ## Then build
 
 Head to [`BRIEF.md`](BRIEF.md). Build the RAG foundation and escalation logic first, then
