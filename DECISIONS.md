@@ -565,6 +565,34 @@ is exactly why it's flagged and shadow-logged rather than assumed.
 - [x] **Availability.** Not required for a time-only extend; it gates location-change
       modify (`409 VEHICLE_UNAVAILABLE` with alternatives) and powers the flexible-date
       feature. Confirms location-Modify as a stretch goal.
+
+      **Revisited 2026-08-06** — the real-world concern this leaves on the table: does
+      extending customer A's rental risk double-booking the same physical car against
+      customer B's upcoming pickup (the "walked customer" problem every rental company
+      actually has)? Checked whether `/availability` could serve as a pre-extend guard
+      and confirmed, live, that it can't: called it three times for one location/type/
+      date-window (count held at 9), then extended a real reservation and re-queried the
+      same window — **still 9, completely unaffected**. `/availability` has no
+      cross-endpoint state; it cannot reflect what `/extend` just did, so checking it
+      before a write would be consulting a number structurally incapable of answering
+      the question. It's also the wrong shape of check even in principle — an aggregate
+      class/location count for *new* bookings says nothing about whether *this specific*
+      vehicle is already promised to someone else.
+
+      Separately, `/extend` accepts a `new_return_datetime` up to four years out with no
+      capacity-related error of any kind, and (called directly, bypassing our own
+      `extend_flow` guard) accepts a return time *earlier* than the current one — the API
+      itself does not enforce that an extension move the return later. That guard exists
+      only in our client. Consistent with §2's "the agent must read state rather than
+      trust the request makes sense," but worth stating plainly: without our own
+      validation layer, this API will accept requests that make no sense.
+
+      **Conclusion: not built.** The correct fix for the fleet-conflict risk is on Avis's
+      side — `/extend` should return a `409`-class conflict error the same way `/modify`
+      already does for location changes — not a speculative pre-check bolted onto the
+      client using a signal that can't detect the problem. Flagging this to Avis (a
+      genuine reservation-integrity gap, not a UI nicety) would be one of the first
+      things raised in a real handoff of this build.
 - [x] **Failure modes.** ~99% reliable with occasional 5xx and slow/timed-out responses,
       worst on availability and writes. Strict input validation (4xx envelope). No
       documented rate limits.
