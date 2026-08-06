@@ -6,6 +6,7 @@ openai>=1.40
 
 python-dotenv>=1.0
 requests>=2.31
+pytest>=8.0
 
 # For RAG, add a vector store / embeddings library of your choosing, e.g.:
 #   chromadb        (simple local vector DB)
