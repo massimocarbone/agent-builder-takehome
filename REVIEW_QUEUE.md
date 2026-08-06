@@ -101,7 +101,25 @@ assertion is at the **agent** level — that it declines — not at the retrieva
 
 ---
 
+---
+
 ## Cleared
+
+### 17. No authoritative source for "today" — FIXED
+Instructions are now a callable regenerated every turn, injecting real UTC time (a static
+string would go stale once the process outlived its start day). `build_quote()` gained a
+real-time floor rejecting targets already past relative to reality — the reservation's own
+stored dates are months stale and are not a substitute for knowing the actual date.
+Verified live: "extend to the 20th" on a June reservation now returns "June 20, 2026 has
+already passed... the new date needs to be in the future from today (August 6, 2026)"
+instead of quoting a backdated charge. Tests pin `now=EXTEND_TEST_NOW` so the suite
+doesn't become its own time bomb; new guard mutation-verified.
+
+### 18. Compound confirmation question produced ambiguous consent — FIXED
+Added an explicit rule: never treat a reply to a compound or multi-part question as
+consent to cancel — re-ask the cancel question alone, with the specific figures. Verified
+on the exact original input: "yeah do the original" now collects the email rather than
+cancelling (`consumed=False`), where it previously cancelled a real reservation.
 
 ### 5. Bot identity not disclosed until challenged — FIXED
 The CLI greeting now opens with "I'm Avis's automated assistant", and the instructions
