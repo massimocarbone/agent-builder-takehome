@@ -273,7 +273,7 @@ def commit_extension(session: ServicingSession, email: str, cvv: str, billing_zi
 
 # Error codes that mean "a human should take this", not "try again".
 ESCALATING_CODES = {"RESERVATION_NOT_ACTIVE", "PAYMENT_DECLINED", "EXHAUSTED_RETRIES",
-                    "INVALID_EXTENSION"}
+                    "INVALID_EXTENSION", "MALFORMED_RESERVATION"}
 
 
 def classify_failure(session: ServicingSession, exc: AvisAPIError, operation: str) -> dict:

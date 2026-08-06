@@ -34,15 +34,38 @@ from session import ServicingSession, log_event  # noqa: E402
 # Thin wrappers. The money-touching logic lives in extend_flow so it can be read and
 # tested without an LLM in the loop.
 
+_HANDED_OFF = {
+    "ok": False,
+    "handed_off": True,
+    "customer_message": (
+        "This conversation has been handed to a representative. Do not look anything up, "
+        "quote, or change the booking. Acknowledge the customer warmly and let them know "
+        "the representative has everything and will pick it up."
+    ),
+}
+
+
+def _blocked(session: ServicingSession) -> dict | None:
+    """After a hard handoff, action tools refuse.
+
+    Enforced here rather than asked for in the prompt: on 2026-08-05 the agent announced a
+    handoff and then serviced the request itself 19 seconds later. A state the model can
+    narrate but not be bound by is not a state.
+    """
+    return _HANDED_OFF if session.handed_off else None
+
 
 @function_tool
 def lookup_reservation(ctx: RunContextWrapper[ServicingSession], reservation_id: str) -> dict:
     """Look up an Avis reservation by ID (e.g. 'AVS-29471835').
 
-    Reads are open, so call this first. Do not read back card, plate, or address details
-    before the customer has been verified — confirm only what is needed to proceed.
+    Call this whenever a customer references a reservation — for a change OR just to
+    answer a question about it. Everything this returns may be shared with the caller
+    except `card_last_four`, which needs verification first.
     """
     session = ctx.context
+    if blocked := _blocked(session):
+        return blocked
     try:
         reservation = get_reservation(reservation_id.strip().upper())
     except AvisAPIError as exc:
@@ -78,6 +101,8 @@ def quote_extension(ctx: RunContextWrapper[ServicingSession], new_return_datetim
     branch's local timezone.
     """
     session = ctx.context
+    if blocked := _blocked(session):
+        return blocked
     try:
         return {"ok": True, **extend_flow.build_quote(session, new_return_datetime)}
     except extend_flow.FlowError as exc:
@@ -96,6 +121,8 @@ def confirm_extension(ctx: RunContextWrapper[ServicingSession], email: str, cvv:
     quote has gone stale this re-prices first and returns the new total for
     re-confirmation instead of charging a price the customer never accepted.
     """
+    if blocked := _blocked(ctx.context):
+        return blocked
     return extend_flow.commit_extension(ctx.context, email, cvv, billing_zip)
 
 
@@ -118,14 +145,20 @@ def search_policy(query: str) -> dict:
 
 @function_tool
 def escalate_to_human(ctx: RunContextWrapper[ServicingSession], reason: str,
-                      customer_intent: str, reservation_id: str = "") -> dict:
+                      customer_intent: str, reservation_id: str = "",
+                      kind: str = "hard") -> dict:
     """Hand off to a human agent, passing along everything collected so far.
 
-    Use when the customer asks for something outside this agent's scope (including
-    accepting an Avis Preferred membership upgrade), when confidence is low, or when an
-    error can't be resolved by re-collecting input. The customer should never have to
-    repeat information they already gave. Pass reservation_id if the customer has given
-    one, even if you haven't looked it up yet.
+    kind="hard" — a real transfer. Use for actions this agent must not take (cancel,
+    membership upgrade, location change), repeated verification failure, or an error that
+    re-collecting input won't fix. After this you stop working the request entirely.
+
+    kind="assistive" — you're pulling a person in to help with something you can't do,
+    but the customer may still resolve it themselves (e.g. they can't find their
+    reservation ID). The conversation stays open; if they find it, carry on normally.
+
+    Pass reservation_id if the customer has given one, even if you haven't looked it up.
+    The customer should never have to repeat information they already gave.
     """
     session = ctx.context
 
@@ -140,28 +173,52 @@ def escalate_to_human(ctx: RunContextWrapper[ServicingSession], reason: str,
             log_event("escalation_lookup_failed", reservation_id=reservation_id,
                       code=exc.code)
 
+    hard = kind != "assistive"
     session.escalated = True
     session.escalation_reason = reason
+    session.handed_off = hard
     session.note("customer_intent", customer_intent)
     payload = session.escalation_payload()
-    log_event("escalated", reason=reason, reservation_id=session.reservation_id,
-              payload=payload)
-    return {"ok": True, "escalated": True, "handoff": payload,
+    log_event("escalated", kind="hard" if hard else "assistive", reason=reason,
+              reservation_id=session.reservation_id, payload=payload)
+
+    if hard:
+        return {"ok": True, "escalated": True, "handed_off": True, "handoff": payload,
+                "customer_message":
+                    "I'm connecting you with a representative and passing along everything "
+                    "we've covered — including our conversation — so they can pick up where "
+                    "we left off. Tell the customer this, then stop working the request."}
+    return {"ok": True, "escalated": True, "handed_off": False, "handoff": payload,
             "customer_message":
-                "I'm connecting you with a representative, and passing along everything "
-                "we've covered so they can pick up where we left off."}
+                "A representative can help with this. Stay with the customer meanwhile — if "
+                "they resolve what was blocking them, carry on as normal."}
 
 
 # --- Agent --------------------------------------------------------------------------
 
 INSTRUCTIONS = """\
-You are an Avis rental servicing agent. You help customers EXTEND an active rental —
-pushing out the return date/time. That is the only change you can make yourself.
+You are an automated Avis rental servicing assistant. Say so if anyone asks whether
+they're talking to a person, and don't pretend otherwise.
 
-Flow, in order:
+You help customers with an existing rental. You can:
+- look up a reservation and answer questions about it
+- answer policy questions from the Avis knowledge base
+- EXTEND a rental — push out the return date/time. This is the only change you make.
+
+WHAT YOU MAY TELL A CALLER
+Once you have looked a reservation up, you may freely share: the vehicle, the pickup and
+return dates/times, pickup and return locations, the daily rate, the amount already
+charged, membership status, and the reservation status. Answering "when is my car due
+back?" is a normal, supported thing to do — the customer does not have to be making a
+change to get an answer about their own booking, and you never require them to start an
+extension in order to be told something.
+
+Before the customer is verified (they give the email on file), do NOT read out the card's
+last four digits. That is the only restriction.
+
+EXTENDING, in order:
 1. Get the reservation ID and look it up. Confirm you have the right rental by naming the
-   vehicle and current return time. Do not read out card, license plate, or address
-   details — the caller has not been verified yet.
+   vehicle and current return time.
 2. Find out the new return date/time they want. Times are local to the rental branch.
 3. Quote it. Always state the total clearly, in currency, and say what it covers before
    asking for agreement.
@@ -169,26 +226,38 @@ Flow, in order:
    CVV and billing ZIP — all three are required to authorize the charge.
 5. Confirm the extension and give them the confirmation number.
 
-Rules you do not bend:
-- Never charge anything the customer has not seen and agreed to. If the tool says the
-  price changed, show the new total and get agreement again.
-- If the price comes back different from what you quoted, say so plainly.
-- You cannot cancel, modify locations, change vehicle class, or upgrade memberships. If
-  asked, say so directly and offer to connect them to a representative — do not imply you
-  might be able to do it.
-- If a customer wants an Avis Preferred membership upgrade, you do not process it.
-  Escalate with escalate_to_human so a representative can finalize it along with the
-  extension in one go.
-- Whenever you escalate, pass the reservation ID if the customer has given one, and
-  summarize what they actually want in customer_intent. The representative should be able
-  to pick up without asking them anything twice.
-- When a tool returns escalate: true, stop working the request and hand off.
-- Never invent prices, fees, policies, or confirmation numbers. Every number you say must
-  come from a tool result.
-- For policy questions (grace periods, fees, refund timing, membership benefits), use
-  search_policy and answer from what it returns. If it returns nothing, say you don't
-  have that policy on hand and offer a representative. Policy articles explain rules;
-  they are never a source for the price of this customer's change — only quotes are.
+RULES YOU DO NOT BEND
+- Never charge anything the customer has not seen and agreed to. If a tool says the price
+  changed, show the new total and get agreement again.
+- Never invent prices, fees, policies, rules, or confirmation numbers. Every number you
+  state must come from a tool result.
+- Never invent a REASON either. If you're asked why a fee applies and no retrieved article
+  explains it, say plainly that it's the standard fee and you don't have detail on why it
+  landed on this booking. Do not reason your way to a policy that sounds plausible.
+- Never describe your own limits as "Avis policy" or "for security reasons" unless a
+  retrieved article actually says so. If you can't do something, it's a limit of what this
+  service handles — say that, in those words.
+- For policy questions (grace periods, fees, refund timing, membership benefits) use
+  search_policy and answer from what it returns. If it returns nothing, say you don't have
+  that policy on hand and offer a representative. Articles explain rules; they are never a
+  source for the price of this customer's change — only quotes are.
+
+WHAT YOU HAND OFF
+- Actions you cannot take: cancelling, changing the return location or vehicle class, and
+  Avis Preferred membership upgrades. Say so directly — don't imply you might manage it —
+  and escalate with kind="hard".
+- If a customer wants a membership upgrade, you never process it. Escalate so a
+  representative can finalize the upgrade and any pending extension together.
+- Use kind="assistive" when you're bringing in help but the customer might still resolve
+  it themselves (e.g. they can't find their reservation ID). Stay with them; if they find
+  it, carry on.
+- Whenever you escalate, pass the reservation ID if you have one and summarize what the
+  customer actually wants. They should never repeat themselves to the representative.
+- After a hard handoff you stop working the request. Don't look things up, quote, or
+  change anything — the tools will refuse anyway. Be warm, confirm the representative has
+  everything, and wait with them.
+- If the customer is going in circles, getting frustrated, or you've failed twice to help,
+  offer a representative rather than repeating yourself.
 
 Be warm and brief. This is a phone-style conversation, not a form.
 """
@@ -211,10 +280,13 @@ def run_turn(user_input: str, servicing_session: ServicingSession, history: SQLi
     their card details. Same principle as the API client: back off and retry the transient
     thing, surface the terminal thing.
     """
+    servicing_session.record("customer", user_input)
     for attempt in range(1, max_attempts + 1):
         try:
-            return Runner.run_sync(servicing_agent, user_input,
-                                   context=servicing_session, session=history)
+            result = Runner.run_sync(servicing_agent, user_input,
+                                     context=servicing_session, session=history)
+            servicing_session.record("agent", str(result.final_output))
+            return result
         except Exception as exc:  # noqa: BLE001 - provider SDKs raise varied types
             transient = type(exc).__name__ in {"RateLimitError", "APIConnectionError",
                                                "APITimeoutError", "InternalServerError"}

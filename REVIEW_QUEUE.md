@@ -5,42 +5,27 @@ names the file, the problem, and the decision to be made — not a patch to rubb
 
 Cleared items move to the bottom with their resolution.
 
----
-
 ## Open
 
-> Items 2–8 all come from one unscripted human session on 2026-08-05 (`AVS-48372915`).
-> A single real conversation surfaced more than four scripted adversarial tests did —
-> worth repeating before every merge from here on.
+> Numbers are stable — cleared items keep their id and move to the bottom rather than
+> being renumbered, so commit messages and PR comments stay resolvable.
+>
+> Items 2–9 came from one unscripted human session on 2026-08-05, and 12–13 from a
+> second. Two real conversations surfaced more than every scripted test combined —
+> worth repeating before each merge.
 
-### 2. Hallucinated *reasons* for real numbers — highest severity
-**Where:** prompt guardrails in `src/agent.py`; `search_policy` usage.
+### 1. Agent volunteers the remaining verification-attempt count
+**Where:** `src/extend_flow.py`, `commit_extension`, the `VERIFICATION_FAILED` branch.
 
-Asked why a $29 late fee applied, the agent answered: *"because the new return time is
-more than 24 hours past your original due time. Even on extensions, some locations add
-this fee, especially if the new return stretches beyond their standard grace periods."*
+The customer-facing message says `Attempt N of 3`, and the model relays it ("you still have
+two more tries"). Friendlier, but it also tells someone probing a reservation ID exactly how
+much runway they have before the session escalates.
 
-**None of that exists in any article.** The real reason is mundane: the rental was due
-2026-06-09 and is already ~2 months overdue, so the fee is simply the standard late fee.
+**The call:** keep it (transparency, and the reservation ID is the weaker secret anyway) or
+drop the count and let escalation arrive unannounced. Either is defensible; it's a
+security-vs-UX judgment, which is why it's here rather than silently decided.
 
-The existing rule — "never invent prices, fees, policies" — covers *figures*, and the
-figures were all correctly tool-sourced. It does not cover **causal explanations of
-figures**, which is arguably worse: a customer who believes "return within 24 hours and I
-avoid it" makes a decision on invented policy. Fix is a prompt constraint plus a
-disclosure norm: explanations must be quoted or paraphrased from a retrieved article, and
-when no article explains it, say so ("that's the standard late fee — I don't have detail
-on why it applied to this booking").
-
-### 3. Over-escalation on questions it can already answer
-The customer asked to *check the status* of the reservation and later *what it cost*. The
-agent escalated for the first and refused the second ("I'm not able to provide full
-pricing breakdowns") — while holding a tool result containing `daily_rate`,
-`total_charged`, dates, vehicle, and status.
-
-Burning a human handoff on data already in hand is the expensive-but-safe failure
-direction, and it's the one that shows up in cost-per-contact. The agent should answer
-read-only questions about a reservation it has loaded. Escalate on *actions* it can't
-take, not *facts* it already has.
+---
 
 ### 4. No frustration / no-progress escalation trigger
 The session degenerated into `no` → `no` → `what` → `no i wann wtd`, with the agent
@@ -124,19 +109,30 @@ assertion is at the **agent** level — that it declines — not at the retrieva
 
 ---
 
-### 1. Agent volunteers the remaining verification-attempt count
-**Where:** `src/extend_flow.py`, `commit_extension`, the `VERIFICATION_FAILED` branch.
-
-The customer-facing message says `Attempt N of 3`, and the model relays it ("you still have
-two more tries"). Friendlier, but it also tells someone probing a reservation ID exactly how
-much runway they have before the session escalates.
-
-**The call:** keep it (transparency, and the reservation ID is the weaker secret anyway) or
-drop the count and let escalation arrive unannounced. Either is defensible; it's a
-security-vs-UX judgment, which is why it's here rather than silently decided.
-
 ---
 
 ## Cleared
 
-_(none yet)_
+### 12. Escalation is advisory, not terminal — FIXED
+`handed_off` is now a distinct terminal state that action tools check via `_blocked()`.
+Split into `kind="hard"` (terminal: cancel, upgrade, repeated verification failure) and
+`kind="assistive"` (revocable: customer can't find their reservation ID). Verified live —
+after a cancel request the agent refuses a follow-up extension instead of servicing it.
+
+### 13. Fabricated access-control policy — FIXED
+Root cause addressed: instructions now state **affirmative permission** (vehicle, dates,
+locations, daily rate, amount charged, membership, status are all shareable; only
+`card_last_four` needs verification) instead of leaving a vacuum the model filled with
+invented rules. Added a ban on describing its own limits as "Avis policy" or "for security
+reasons" unless a retrieved article says so. Replayed the exact broken conversation: the
+agent now answers the question directly.
+
+### 2. Hallucinated *reasons* for real numbers — FIXED
+Instructions now forbid inventing a reason as explicitly as inventing a number: if no
+retrieved article explains a fee, say it's the standard fee and that detail isn't
+available. Verified — the late-fee explanation is now sourced from `kb_fee_02` rather than
+the fabricated "more than 24 hours past your original due time" rule.
+
+### 3. Over-escalation on answerable questions — FIXED
+The agent's remit is now "look up a reservation and answer questions about it" rather than
+extend-only. Read-only questions about a loaded reservation are answered, not escalated.
