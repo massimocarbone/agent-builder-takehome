@@ -264,6 +264,13 @@ def revalidate_quote(session: ServicingSession) -> dict | None:
     quote.quoted_at = time.monotonic()
 
     if abs(float(new_total) - float(old_total)) >= 0.01:
+        # A new number is a new quote, so it re-enters the gate at the start: the customer
+        # has not seen this total, and the turn boundary must be re-earned. Without this,
+        # the refusal below is advice the model can ignore — it can call the write again
+        # inside the same turn and the gate waves the *repriced* total straight through,
+        # which is precisely the charge-they-never-saw the gate exists to prevent.
+        quote.quoted_on_turn = session.turn
+        quote.accepted = False
         log_event("quote_reprice_delta", reservation_id=session.reservation_id,
                   old_total=old_total, new_total=new_total)
         return {"repriced": True, "previous_total": old_total, "new_total": new_total,
@@ -331,18 +338,78 @@ def commit_extension(session: ServicingSession, email: str, cvv: str, billing_zi
                     "The CVV or billing ZIP wasn't accepted. Ask the customer to re-check both."}
         return classify_failure(session, exc, "commit_extension")
 
+    # The email was accepted, so verification is real regardless of what else the response
+    # is missing — recording it here rather than after the completeness check keeps a
+    # half-formed response from also costing the customer their verified state.
     session.verified_email = email.strip()
+
+    # A write that returns neither a confirmation number nor charges has not told us an
+    # extension happened; `success: true` alone is a claim, not evidence. Consuming the
+    # quote here would strand the customer: the retry path refuses ("already processed")
+    # while they hold no confirmation number, so the only exit is a human. Leave the quote
+    # live and escalate instead.
+    actual_charges = result.get("charges") or {}
+    confirmation = result.get("confirmation_number")
+    if not confirmation or actual_charges.get("total_charged") is None:
+        session.escalated = True
+        session.handed_off = True
+        session.escalation_reason = "extend write returned an incomplete success response"
+        log_event("extension_incomplete_response", reservation_id=session.reservation_id,
+                  confirmation_number=confirmation, charges=actual_charges)
+        return {"ok": False, "escalate": True, "code": "INCOMPLETE_WRITE_RESPONSE",
+                "customer_message":
+                    "The extension may or may not have gone through — the confirmation "
+                    "came back incomplete. Do not charge again. Tell the customer plainly "
+                    "and hand them to a representative to verify the booking.",
+                "handoff": session.escalation_payload()}
+
     quote.accepted = True
     quote.consumed = True
     session.note("completed_extension", {
-        "confirmation_number": result.get("confirmation_number"),
+        "confirmation_number": confirmation,
         "new_return_datetime": quote.new_return_datetime,
     })
     log_event("extension_confirmed", reservation_id=session.reservation_id,
-              confirmation_number=result.get("confirmation_number"), total=quote.total_charged)
-    return {"ok": True, "confirmation_number": result.get("confirmation_number"),
-            "extension_details": result.get("extension_details"),
-            "charges": result.get("charges")}
+              confirmation_number=confirmation, quoted_total=quote.total_charged,
+              actual_total=actual_charges.get("total_charged"))
+
+    outcome = {"ok": True, "confirmation_number": confirmation,
+               "extension_details": result.get("extension_details"),
+               "charges": actual_charges}
+
+    # Post-write reconciliation. Cancel has had this since it was built (its estimate is
+    # KB-derived, so reality could always differ); extend went without because its figure
+    # comes from the API's own /quote. That was an assumption, not a guarantee — the quote
+    # and the write are separate calls and nothing in the API contract binds them. If the
+    # charge doesn't match the number the customer agreed to, the confirmation gate has
+    # been defeated after the fact, and only a human can put that right.
+    actual_total = float(actual_charges.get("total_charged"))
+    delta = actual_total - float(quote.total_charged)
+    if delta >= config.EXTEND_VARIANCE_THRESHOLD_USD:
+        session.escalated = True
+        session.handed_off = True
+        session.escalation_reason = (
+            f"extend charged {actual_total} against an agreed quote of {quote.total_charged}")
+        log_event("extend_variance_adverse", reservation_id=session.reservation_id,
+                  quoted_total=quote.total_charged, actual_total=actual_total,
+                  delta=round(delta, 2))
+        outcome.update({
+            "escalate": True,
+            "price_changed": True,
+            "variance": {"quoted_total": quote.total_charged, "actual_total": actual_total},
+            "handoff": session.escalation_payload(),
+            "customer_message":
+                f"The extension went through but was charged {actual_total} "
+                f"{quote.currency}, not the {quote.total_charged} the customer agreed to. "
+                "Tell them plainly, state both numbers, and say a representative will "
+                "review the difference. Then stop working the request.",
+        })
+    elif delta <= -config.EXTEND_VARIANCE_THRESHOLD_USD:
+        outcome["better_than_quoted"] = True
+        log_event("extend_variance_favorable", reservation_id=session.reservation_id,
+                  quoted_total=quote.total_charged, actual_total=actual_total,
+                  delta=round(delta, 2))
+    return outcome
 
 
 # Error codes that mean "a human should take this", not "try again".

@@ -56,10 +56,19 @@ Run the complete test suite with:
 python -m pytest
 ```
 
-The additional safety-regression tests are marked as strict expected failures while their
-corresponding production safeguards remain unimplemented. Pytest reports them as `XFAIL`;
-if a fix makes one pass, strict mode turns that unexpected pass into a failing result until
-the marker is removed and the test joins the normal regression suite.
+Four tests report as `XFAIL`. Each is a safeguard we **decided not to build**, not one
+that's merely outstanding — the reason is attached to the test and argued in
+[`DECISIONS.md`](DECISIONS.md) (§2 retrieval limits, §3 "Gaps left open on purpose").
+Strict mode means implementing one turns its unexpected pass into a failing result, so a
+gap can't quietly half-close; the marker comes off and the test graduates into the normal
+suite.
+
+`xfail` also swallows *errors*, so a test that crashes before reaching its assertion looks
+identical to a documented gap. Before believing one, read the real failure:
+
+```bash
+python -m pytest tests/test_additional_safety.py --runxfail
+```
 
 Run one file or one area while developing with, for example:
 

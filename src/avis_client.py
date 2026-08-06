@@ -112,7 +112,27 @@ def _request(method: str, path: str, *, params: dict | None = None,
                                     json=body, timeout=REQUEST_TIMEOUT_S)
             status = resp.status_code
             if resp.ok:
-                return resp.json()
+                try:
+                    payload = resp.json()
+                except ValueError:
+                    outcome = "error:MALFORMED_RESPONSE"
+                    raise AvisAPIError("MALFORMED_RESPONSE",
+                                       f"{method} {path} returned {status} with a "
+                                       f"non-JSON body: {resp.text[:200]}",
+                                       status=status, retryable=False) from None
+                # A 2xx carrying the documented failure envelope. Undocumented — the
+                # reference ties errors to 4xx/5xx — but the status line is the API's
+                # claim about itself and the body is its account of what happened, and
+                # trusting the former when they disagree turns a declined payment into a
+                # confirmed extension. This is the only layer that can catch it before it
+                # becomes a confirmation number read out to a customer.
+                if isinstance(payload, dict) and payload.get("success") is False:
+                    envelope = payload.get("error") or {}
+                    code = envelope.get("code", "UNSPECIFIED_FAILURE")
+                    outcome = f"error:{code}"
+                    raise AvisAPIError(code, envelope.get("message", code), status=status,
+                                       retryable=False, details=envelope.get("details"))
+                return payload
 
             try:
                 envelope = resp.json().get("error", {})

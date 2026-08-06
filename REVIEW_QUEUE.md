@@ -246,6 +246,25 @@ extend-only. Read-only questions about a loaded reservation are answered, not es
 
 ---
 
+## Adversarial testing pass (2026-08-06) — closed
+
+Ten strict-xfail tests from an external testing pass. Six fixed and graduated, one fixed
+in part, three deferred with the reason attached to the live test. Full write-up in
+DECISIONS.md §2 (xfail discipline, retrieval limits), §3 (gates), §5 (client envelope),
+changelog. Fixed: repriced quote chargeable in the same turn; mid-rental cancel
+disambiguation never read by the write (`resolve_cancel_intent`); no post-write
+reconciliation on extend; incomplete `success: true` write reported as complete; client
+trusted HTTP status over the response envelope; KB false positives on uncovered topics;
+`escalate_to_human` docstring still naming cancel as forbidden. Deferred:
+affirmative-consent detection, bare-CVV redaction, DST-aware branch time.
+
+**Carried forward for the stress-test session:** the pass's own headline defect was
+methodological — a module-level `xfail` reported four crashing tests as findings. When
+scripted coverage and live sessions disagree about whether something is exercised, trust
+the live session. Item B below is unchanged by any of this.
+
+---
+
 ## Planned for the final session (2026-08-06)
 
 Last dedicated hour: **stress testing and trying to break the system**, plus evaluating

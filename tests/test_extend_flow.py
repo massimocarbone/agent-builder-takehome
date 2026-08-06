@@ -21,6 +21,14 @@ QUOTE = {"success": True, "quote": {"charges": {
     "daily_rate": 38.99, "extension_days": 3, "subtotal": 116.97, "late_fee": 29.0,
     "one_way_fee": 0.0, "taxes_and_fees": 13.5, "total_charged": 159.47, "currency": "USD"}}}
 
+# The documented extend response carries confirmation_number, extension_details AND a
+# charges breakdown. The stub used to return only the confirmation number, which no real
+# response looks like — and post-write reconciliation has nothing to reconcile against a
+# response that omits the total. Same fidelity rule as the reservation fixtures.
+WRITE_OK = {"success": True, "confirmation_number": "EXT-TEST",
+            "extension_details": {"extension_days": 3, "late_return": True},
+            "charges": QUOTE["quote"]["charges"]}
+
 
 def _session():
     s = ServicingSession()
@@ -41,8 +49,7 @@ def _with_stubs(quote=None, write=None):
     """Swap the client functions extend_flow calls; returns a restore callable."""
     orig_q, orig_w = extend_flow.quote_change, extend_flow.extend_reservation
     extend_flow.quote_change = quote or (lambda *a, **k: QUOTE)
-    extend_flow.extend_reservation = write or (
-        lambda *a, **k: {"success": True, "confirmation_number": "EXT-TEST"})
+    extend_flow.extend_reservation = write or (lambda *a, **k: WRITE_OK)
     return lambda: (setattr(extend_flow, "quote_change", orig_q),
                     setattr(extend_flow, "extend_reservation", orig_w))
 

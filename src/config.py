@@ -57,6 +57,13 @@ QUOTE_TTL_SECONDS = float(os.environ.get("QUOTE_TTL_SECONDS", "120"))
 # which is exactly when a person should look. (DECISIONS.md §3, handoff rules.)
 CANCEL_VARIANCE_THRESHOLD_USD = float(os.environ.get("CANCEL_VARIANCE_THRESHOLD_USD", "1.00"))
 
+# The same check on the extend path, kept as a separate knob because the two mean
+# different things. Cancel's estimate is KB-derived, so a variance means an unobserved
+# policy branch. Extend's figure came from the API's OWN /quote minutes earlier, so any
+# variance at all means the API repriced between quote and write — a more serious signal
+# about the integration, and one Avis would want reported at a tighter threshold.
+EXTEND_VARIANCE_THRESHOLD_USD = float(os.environ.get("EXTEND_VARIANCE_THRESHOLD_USD", "0.01"))
+
 # Escalate after this many failed email verifications on a write.
 MAX_VERIFICATION_ATTEMPTS = int(os.environ.get("MAX_VERIFICATION_ATTEMPTS", "3"))
 

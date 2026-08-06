@@ -33,12 +33,19 @@ def _stub_cancel(details=None, error=None):
 
 
 def _staged(res):
-    """Session with an estimate the customer has 'seen' (turn boundary satisfied)."""
+    """Session with an estimate the customer has 'seen' (turn boundary satisfied).
+
+    Mid-rental reservations also need the early-return-vs-cancel question answered, so
+    these tests answer it the way the customer would have to: explicitly, on the turn
+    after they were asked. Tests that mean to probe the gate itself do NOT use this.
+    """
     session = ServicingSession()
     session.load_reservation(res)
     session.turn = 1
     cancel_flow.build_cancel_estimate(session)
     session.turn = 2
+    if session.pending_cancellation.requires_disambiguation:
+        cancel_flow.resolve_cancel_intent(session, cancel_flow.TRUE_CANCELLATION)
     return session
 
 
@@ -225,6 +232,58 @@ def test_sub_threshold_variance_does_not_escalate():
 
 
 # --- disambiguation & retention -----------------------------------------------------
+
+def test_in_rental_cancel_is_blocked_until_intent_is_resolved():
+    """The disambiguation was advisory until the write started reading it."""
+    writes = []
+    restore = _stub_cancel(details={"penalty": 38.99, "refund_amount": 77.98,
+                                    "prepaid_amount": 116.97, "currency": "USD"})
+    try:
+        session = ServicingSession()
+        session.load_reservation(reservation())
+        session.turn = 1
+        cancel_flow.build_cancel_estimate(session)
+        session.turn = 2
+        out = cancel_flow.commit_cancellation(session, "marcus.lee@example.com")
+        assert out["ok"] is False and out.get("requires_disambiguation") is True, out
+        assert session.pending_cancellation.consumed is False, out
+    finally:
+        restore()
+
+
+def test_early_return_intent_discards_the_staged_cancellation():
+    """'I'll bring it back' must leave nothing a later tool call could commit."""
+    session = ServicingSession()
+    session.load_reservation(reservation())
+    session.turn = 1
+    cancel_flow.build_cancel_estimate(session)
+    session.turn = 2
+    out = cancel_flow.resolve_cancel_intent(session, cancel_flow.EARLY_RETURN)
+    assert out["ok"] is True and out["nothing_cancelled"] is True, out
+    assert session.pending_cancellation is None, "an early return left a committable estimate"
+
+    restore = _stub_cancel(details={"penalty": 38.99, "refund_amount": 77.98,
+                                    "prepaid_amount": 116.97, "currency": "USD"})
+    try:
+        session.turn = 3
+        follow_up = cancel_flow.commit_cancellation(session, "marcus.lee@example.com")
+        assert follow_up["ok"] is False, follow_up
+    finally:
+        restore()
+
+
+def test_ambiguous_intent_is_not_accepted_as_an_answer():
+    """The model must not launder an unclear reply into a resolved intent."""
+    session = ServicingSession()
+    session.load_reservation(reservation())
+    session.turn = 1
+    cancel_flow.build_cancel_estimate(session)
+    session.turn = 2
+    for guess in ["maybe", "cancel", "", "yes"]:
+        out = cancel_flow.resolve_cancel_intent(session, guess)
+        assert out["ok"] is False, f"{guess!r} was accepted as a resolved intent: {out}"
+    assert session.pending_cancellation.intent_confirmed is False
+
 
 def test_in_rental_summary_carries_early_return_alternative():
     session = ServicingSession()

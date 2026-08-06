@@ -44,6 +44,7 @@ def build_cancel_estimate(session: ServicingSession) -> dict:
         citation=estimate.citation,
         caveats=estimate.caveats,
         quoted_on_turn=session.turn,
+        requires_disambiguation=estimate.requires_disambiguation,
     )
     log_event("cancel_estimate_created", reservation_id=session.reservation_id,
               branch=estimate.branch, penalty=estimate.penalty, refund=estimate.refund,
@@ -94,6 +95,53 @@ def _retention_prompt(session: ServicingSession, estimate: policy.CancelEstimate
         session.note("retention_prompt_offered", True)
 
 
+TRUE_CANCELLATION = "true_cancellation"
+EARLY_RETURN = "early_return"
+
+
+def resolve_cancel_intent(session: ServicingSession, intent: str) -> dict:
+    """Record which of the two mid-rental outcomes the customer actually chose.
+
+    The disambiguation in ``build_cancel_estimate`` was advisory until this existed: the
+    summary told the model to ask, and nothing checked that it had. A customer who says
+    "I'm done with it, I'll bring it back" and gets cancelled anyway pays one day's rate
+    for a word choice — the trust failure DECISIONS.md §3 names as invisible to anyone not
+    looking for it. So the answer becomes state, and the write reads it.
+
+    ``early_return`` discards the staged estimate outright: there is nothing to commit,
+    and leaving it staged leaves it committable.
+    """
+    staged = session.pending_cancellation
+    if not staged:
+        return {"ok": False, "customer_message":
+                "There's no cancellation estimate on the table. Estimate it first."}
+    if intent not in {TRUE_CANCELLATION, EARLY_RETURN}:
+        return {"ok": False, "customer_message":
+                f"Intent must be {TRUE_CANCELLATION!r} or {EARLY_RETURN!r}. If the "
+                "customer's answer wasn't clearly one of those, ask again — don't guess."}
+
+    log_event("cancel_intent_resolved", reservation_id=session.reservation_id,
+              intent=intent, branch=staged.branch, turn=session.turn)
+
+    if intent == EARLY_RETURN:
+        session.pending_cancellation = None
+        session.note("resolved_as_early_return", True)
+        return {"ok": True, "intent": EARLY_RETURN, "nothing_cancelled": True,
+                "customer_message":
+                    "Nothing has been cancelled and nothing will be charged for the "
+                    "change. Tell the customer to return the vehicle to the branch; the "
+                    "rental is billed for the time actually used, with no early-return "
+                    "fee (kb_can_04). The reservation stays as it is.",
+                "citation": {"article_id": "kb_can_04", "title": "Ending a Rental Early"}}
+
+    staged.intent_confirmed = True
+    return {"ok": True, "intent": TRUE_CANCELLATION,
+            "customer_message":
+                "Recorded that the customer wants a true cancellation. Restate the "
+                "estimated penalty and refund and that the vehicle must still be "
+                "returned, then take their explicit agreement before confirming."}
+
+
 def commit_cancellation(session: ServicingSession, email: str,
                         reason: str | None = None) -> dict:
     """The gated write, then the variance check against what the customer agreed to.
@@ -116,6 +164,14 @@ def commit_cancellation(session: ServicingSession, email: str,
         return {"ok": False, "customer_message":
                 "The customer has not seen this estimate yet. State the penalty and "
                 "refund, wait for them to agree, and only then cancel."}
+    if staged.requires_disambiguation and not staged.intent_confirmed:
+        return {"ok": False, "requires_disambiguation": True, "customer_message":
+                "The customer is holding the vehicle, so 'cancel' is ambiguous and this "
+                "is blocked until it's resolved. Ask whether they mean a true "
+                "cancellation (penalty of one day's rate, refund of the remainder, and "
+                "the car still has to come back) or an early return (no fee, handled at "
+                "the counter, nothing processed here). Record their answer with "
+                "resolve_cancel_intent, then come back."}
 
     try:
         result = cancel_reservation(session.reservation_id, email.strip(), reason=reason)
