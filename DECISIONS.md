@@ -323,14 +323,67 @@ documented) before being trusted. The plan held up well and is worth recording:
   number is precisely what determines whether it's worth turning on, and dropping
   failures from the log would make it look more reliable than it is.
 
-**Decision: build the independently-real Phase 0 fix now, as its own PR. Hold the
-librarian itself.** Full estimated cost across the whole plan is ~4 hours; the residual
-gap it would close is narrow (one class of lexical homonym) and already honestly
-mitigated by the `low_confidence` flag shipped above. That's a real scope commitment
-against a stress-testing session, not something to fall into by default because the
-plan is good — and it is good; the reasons for holding are cost and priority, not
-quality. Revisit if shadow-style evidence (or a stress-testing finding) makes the case
-that the residual gap is costing more than the mitigation is worth.
+**Decision (superseded below): build the independently-real Phase 0 fix now, as its own
+PR. Hold the librarian itself.** Full estimated cost across the whole plan is ~4 hours;
+the residual gap it would close is narrow (one class of lexical homonym) and already
+honestly mitigated by the `low_confidence` flag shipped above. That's a real scope
+commitment against a stress-testing session, not something to fall into by default
+because the plan is good — and it is good; the reasons for holding are cost and
+priority, not quality.
+
+### Revisited: librarian over embeddings, once time and threat model were checked
+
+Two things changed the calculus enough to reopen the decision above.
+
+**Modern embeddings are not the lexical index they'd need to be feared as.** Worth
+stating precisely, because the concern was reasonable: *old-style* word embeddings
+(Word2Vec, GloVe) really would inherit this exact problem — one fixed vector per word
+regardless of context, so "waiver" gets a single smeared representation whether it
+means damage coverage or a fee exemption. But every embedding model anyone would
+actually reach for now (`text-embedding-3`, Cohere, BGE, E5 — anything built on a
+transformer, which is all of them since ~2019) embeds a whole phrase as a unit, so the
+vector for "waiver" is shaped by what surrounds it. "Damage waiver" and "late-fee
+waiver" land measurably apart, for the same reason the model can tell any other pair of
+homonyms apart in ordinary text — this is default behavior, not something that needs
+engineering in. Not infallible (a very short, thin query gives less context to
+disambiguate from than a full sentence), but categorically more capable than lexical
+scoring, which has no sense-awareness at all, by construction.
+
+That reframes embeddings and the librarian as **complementary layers, not competing
+choices**: the standard production pattern is embeddings for cheap first-pass candidate
+retrieval at any corpus size, then an LLM reasoning over just that short list for final
+semantic arbitration. This also resolves the scale objection raised against Phase 2's
+compact-index producer above — at genuine scale, the librarian wouldn't scan the whole
+corpus, it would arbitrate over the ~20 candidates embeddings already narrowed down to.
+
+**The brief was checked directly for a large-corpus threat, rather than assumed.**
+Grepped `BRIEF.md` and `docs/api-reference.md` for every variant of "unseen" / "haven't
+seen" / "scale." The *only* such language anywhere is scoped explicitly to
+**reservations**: *"We'll also try your agent on reservations you haven't seen, so
+avoid hard-coding to specific IDs."* Nothing anywhere suggests the knowledge base is
+varied, expanded, or swapped at evaluation time — it's introduced once, plainly, as
+static provided data. Building for a larger corpus at evaluation time would be
+defending against a threat the brief does not name.
+
+**Decision, superseding the one above: implement the librarian (Phases 0–5), not
+embeddings, for this submission.** Three reasons, in order of weight:
+
+1. With the scale threat unsupported by the brief, the comparison is just "which fixes
+   the known homonym gap better, with the least new risk, in the time actually
+   available" — not "which handles more articles."
+2. The librarian reuses infrastructure already trusted throughout this build (the same
+   provider, the same `@function_tool` wrapping pattern, the same testing discipline).
+   Embeddings would add a new dependency, a new provider integration, and a new failure
+   mode to test, for a scale benefit nothing here asks for.
+3. The librarian's business-context block gives a capability embeddings structurally
+   cannot: reasoned answers like *"we don't sell that"* rather than *"nothing scored
+   high enough."* A vector store can only report similarity to what already exists in
+   the corpus; it has no way to represent a concept the business doesn't offer at all.
+
+The scale-up story is not lost by choosing this — it remains fully argued above, and a
+reviewer reads that reasoning either way. What changed is not "do we understand
+embeddings," it's "does *this* submission need them," and the answer, checked rather
+than assumed, is no.
 
 ### Testing strategy: fixtures from real payloads, never invented from scratch
 
@@ -932,6 +985,20 @@ logs are written.
 
 ## 8. Changelog
 
+- **2026-08-06** — Reopened the librarian-vs-embeddings decision after two checks.
+  Clarified that modern (transformer-based) embeddings are contextual, not the
+  fixed-per-word lexical index older Word2Vec-style embeddings were — they would likely
+  separate "damage waiver" from "late-fee waiver" correctly — which reframes embeddings
+  and the librarian as complementary layers (cheap candidate retrieval at scale, then
+  LLM arbitration over a short list) rather than competing choices. Checked the brief
+  directly rather than assuming: the only "we'll test with what you haven't seen"
+  language anywhere is scoped to reservations, not the knowledge base — no evidence a
+  larger corpus is part of evaluation. With the scale threat unsupported, decided to
+  implement the librarian (not embeddings) for this submission: it reuses infrastructure
+  already trusted throughout the build, and its business-context block gives a
+  capability embeddings can't — a reasoned "we don't sell that" instead of "nothing
+  scored high enough." Supersedes the prior "hold both" decision below now that a
+  parallel build makes the time cost moot.
 - **2026-08-06** — Evaluated an LLM-mediated ("librarian") retrieval stage for the
   homonym gap documented above. Reframed "agent" into "single non-agentic classification
   call" and "agent memorizes the KB" into "agent rewrites the query, retrieval still
