@@ -187,4 +187,28 @@ security-vs-UX judgment, which is why it's here rather than silently decided.
 
 ## Cleared
 
+### 12. Escalation is advisory, not terminal — FIXED
+`handed_off` is now a distinct terminal state that action tools check via `_blocked()`.
+Split into `kind="hard"` (terminal: cancel, upgrade, repeated verification failure) and
+`kind="assistive"` (revocable: customer can't find their reservation ID). Verified live —
+after a cancel request the agent refuses a follow-up extension instead of servicing it.
+
+### 13. Fabricated access-control policy — FIXED
+Root cause addressed: instructions now state **affirmative permission** (vehicle, dates,
+locations, daily rate, amount charged, membership, status are all shareable; only
+`card_last_four` needs verification) instead of leaving a vacuum the model filled with
+invented rules. Added a ban on describing its own limits as "Avis policy" or "for security
+reasons" unless a retrieved article says so. Replayed the exact broken conversation: the
+agent now answers the question directly.
+
+### 2. Hallucinated *reasons* for real numbers — FIXED
+Instructions now forbid inventing a reason as explicitly as inventing a number: if no
+retrieved article explains a fee, say it's the standard fee and that detail isn't
+available. Verified — the late-fee explanation is now sourced from `kb_fee_02` rather than
+the fabricated "more than 24 hours past your original due time" rule.
+
+### 3. Over-escalation on answerable questions — FIXED
+The agent's remit is now "look up a reservation and answer questions about it" rather than
+extend-only. Read-only questions about a loaded reservation are answered, not escalated.
+
 _(none yet)_

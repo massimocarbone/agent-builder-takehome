@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -53,6 +54,20 @@ class PendingQuote:
         return time.monotonic() - self.quoted_at
 
 
+# Customers type card codes straight into chat ("cvv is 847"). The transcript is handed to
+# a human and written to logs, so scrub the obvious secrets first. Best-effort by nature —
+# free text can always hide a number somewhere this misses.
+_SECRET_PATTERNS = [
+    re.compile(r"(?i)\b(cvv|cvc|security code)\b\D{0,10}(\d{3,4})"),
+    re.compile(r"\b(?:\d[ -]?){13,19}\b"),  # card-like digit runs
+]
+
+
+def redact_text(text: str) -> str:
+    out = _SECRET_PATTERNS[0].sub(lambda m: f"{m.group(1)} ***", text or "")
+    return _SECRET_PATTERNS[1].sub("***", out)
+
+
 @dataclass
 class ServicingSession:
     """Per-conversation state. One instance per customer interaction."""
@@ -63,8 +78,20 @@ class ServicingSession:
     failed_verifications: int = 0
     escalated: bool = False
     escalation_reason: str | None = None
+    # Terminal handoff. Distinct from `escalated`: an *assistive* escalation ("I can't help
+    # you find your reservation id") should stay revocable — customers routinely resolve
+    # the blocker a turn later. A *hard* handoff (verification failure, terminal API error,
+    # an action this agent must not take) sets this, and action tools then refuse. The
+    # agent going quiet is enforced here, not requested in the prompt.
+    handed_off: bool = False
+    # Verbatim turns, secrets scrubbed. A human receives this rather than only the model's
+    # own summary of events — the summary is the least trustworthy thing in the payload.
+    transcript: list[dict] = field(default_factory=list)
     # Anything worth handing a human: quoted options, offers made, customer intent.
     collected_context: dict = field(default_factory=dict)
+
+    def record(self, role: str, text: str) -> None:
+        self.transcript.append({"role": role, "text": redact_text(text)})
 
     # --- Convenience accessors ------------------------------------------------------
 
@@ -103,4 +130,5 @@ class ServicingSession:
             "current_return_datetime": reservation.get("dates", {}).get("current_return_datetime"),
             "pending_quote": asdict(self.pending_quote) if self.pending_quote else None,
             "collected_context": self.collected_context,
+            "transcript": self.transcript,
         }
