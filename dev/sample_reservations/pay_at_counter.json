@@ -1,0 +1,40 @@
+{
+  "reservation_id": "AVS-90000006",
+  "customer_id": "CUST-900006",
+  "customer_name": "Dana Whitfield",
+  "membership_status": "standard",
+  "vehicle": {
+    "type": "suv",
+    "description": "Ford Explorer or similar",
+    "make_model": "2025 Ford Explorer",
+    "color": "Red",
+    "license_plate": "8MNO567"
+  },
+  "pickup_location": {
+    "code": "LAX",
+    "name": "Los Angeles International Airport",
+    "address": "9217 Airport Blvd, Los Angeles, CA 90045"
+  },
+  "return_location": {
+    "code": "LAX",
+    "name": "Los Angeles International Airport",
+    "address": "9217 Airport Blvd, Los Angeles, CA 90045"
+  },
+  "dates": {
+    "pickup_datetime": "2026-08-12T15:49:04-07:00",
+    "current_return_datetime": "2026-08-15T15:49:04-07:00",
+    "original_return_datetime": "2026-08-15T15:49:04-07:00"
+  },
+  "pricing": {
+    "daily_rate": 58.99,
+    "currency": "USD"
+  },
+  "payment": {
+    "card_on_file": {
+      "type": "Visa",
+      "last_four": "3345"
+    },
+    "total_charged": 0.0
+  },
+  "status": "active"
+}
