@@ -41,6 +41,10 @@ ALTERNATIVE_MATERIALITY_ABS_USD = float(os.environ.get("ALTERNATIVE_MATERIALITY_
 ALTERNATIVE_MATERIALITY_PCT = float(os.environ.get("ALTERNATIVE_MATERIALITY_PCT", "0.10"))
 MAX_ALTERNATIVES = 2
 
+# Total wall-clock budget for the speculative alternative quotes. They are a nicety; the
+# extension the customer actually asked for must never wait on them.
+ALTERNATIVE_QUOTE_BUDGET_S = float(os.environ.get("ALTERNATIVE_QUOTE_BUDGET_S", "4"))
+
 # A quote older than this is re-priced before a write, and any delta is surfaced to the
 # customer rather than silently charged (DECISIONS.md §5, quote staleness).
 QUOTE_TTL_SECONDS = float(os.environ.get("QUOTE_TTL_SECONDS", "120"))

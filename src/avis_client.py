@@ -25,6 +25,7 @@ import logging
 import os
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -179,6 +180,18 @@ def validate_reservation(payload: dict) -> dict:
             if node is None:
                 missing.append(".".join(path))
                 break
+
+    # Presence is not enough: an unparseable stored datetime sails through a null check and
+    # then raises a raw ValueError deep in the flow. Same failure the customer-input guard
+    # already covers — stored input deserves it too.
+    for field in ("pickup_datetime", "current_return_datetime"):
+        value = (payload.get("dates") or {}).get(field)
+        if value is not None:
+            try:
+                datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            except ValueError:
+                missing.append(f"dates.{field} (unparseable: {value!r})")
+
     if missing:
         raise AvisAPIError(
             "MALFORMED_RESERVATION",

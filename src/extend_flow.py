@@ -93,12 +93,25 @@ def build_quote(session: ServicingSession, new_return_datetime: str) -> dict:
     response = quote_change(session.reservation_id, "extend", target)
     charges = _charges(response)
 
+    # A quote with no total is not a quote. Staging 0.0 and handing the model None would
+    # leave the customer able to confirm an amount nobody ever stated, and the write
+    # endpoint would then charge whatever it likes.
+    total = charges.get("total_charged")
+    if total is None:
+        log_event("quote_incomplete", reservation_id=session.reservation_id,
+                  new_return_datetime=target, charges=charges)
+        raise FlowError(
+            "The pricing service returned a quote with no total, so there is nothing to "
+            "confirm. Tell the customer you couldn't price it and offer a representative."
+        )
+
     session.pending_quote = PendingQuote(
         change_type="extend",
         new_return_datetime=target,
-        total_charged=charges.get("total_charged", 0.0),
+        total_charged=total,
         currency=charges.get("currency", "USD"),
         charges=charges,
+        quoted_on_turn=session.turn,
     )
     log_event("quote_created", reservation_id=session.reservation_id,
               new_return_datetime=target, total=charges.get("total_charged"),
@@ -173,11 +186,29 @@ def _date_alternatives(session: ServicingSession, target: str, charges: dict) ->
                       candidate=candidate.isoformat(), error=f"{type(exc).__name__}: {exc}")
             return None
 
+    # pool.map() waits for every candidate, and each one can burn the client's full retry
+    # budget — roughly a minute worst case, blocking the reply the customer is waiting on.
+    # Explicit per-future deadline keeps the "never blocks the primary path" promise real.
+    # `with ThreadPoolExecutor(...)` shuts down with wait=True, which blocks on every
+    # in-flight thread and silently defeats a per-future timeout. Shut down without
+    # waiting instead: a straggler finishes into the void (its own request timeout bounds
+    # it) while the customer's answer goes out on schedule.
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(candidates) or 1) as pool:
-        for outcome in pool.map(price, candidates):
+    deadline = time.monotonic() + config.ALTERNATIVE_QUOTE_BUDGET_S
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=len(candidates) or 1)
+    try:
+        futures = {pool.submit(price, c): c for c in candidates}
+        for future, candidate in futures.items():
+            try:
+                outcome = future.result(timeout=max(0.0, deadline - time.monotonic()))
+            except concurrent.futures.TimeoutError:
+                log_event("alternative_quote_dropped", reservation_id=session.reservation_id,
+                          candidate=candidate.isoformat(), error="budget exceeded")
+                continue
             if outcome and outcome["total_charged"] is not None:
                 results.append(outcome)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
     threshold = max(config.ALTERNATIVE_MATERIALITY_ABS_USD,
                     primary_total * config.ALTERNATIVE_MATERIALITY_PCT)
@@ -237,6 +268,14 @@ def commit_extension(session: ServicingSession, email: str, cvv: str, billing_zi
         return {"ok": False, "customer_message":
                 "No quote has been given yet. Quote the extension and confirm the total "
                 "with the customer before charging."}
+    if session.pending_quote.consumed:
+        return {"ok": False, "already_processed": True, "customer_message":
+                "This extension has already been processed. Give the customer the "
+                "confirmation number you already have — do not charge again."}
+    if session.turn <= session.pending_quote.quoted_on_turn:
+        return {"ok": False, "customer_message":
+                "The customer has not seen this quote yet. State the total, wait for them "
+                "to agree, and only then charge."}
 
     try:
         delta = revalidate_quote(session)
@@ -259,6 +298,10 @@ def commit_extension(session: ServicingSession, email: str, cvv: str, billing_zi
                       attempt=session.failed_verifications)
             if session.failed_verifications >= config.MAX_VERIFICATION_ATTEMPTS:
                 session.escalated = True
+                # Terminal: without this the lockout is announced but the caller can keep
+                # guessing emails and charging. Same bug class as the 2026-08-05 incident,
+                # reached through a different code path.
+                session.handed_off = True
                 session.escalation_reason = "repeated verification failure"
                 return {"ok": False, "escalate": True, "code": exc.code,
                         "customer_message": "We could not verify the account after several attempts.",
@@ -273,6 +316,7 @@ def commit_extension(session: ServicingSession, email: str, cvv: str, billing_zi
 
     session.verified_email = email.strip()
     quote.accepted = True
+    quote.consumed = True
     session.note("completed_extension", {
         "confirmation_number": result.get("confirmation_number"),
         "new_return_datetime": quote.new_return_datetime,
@@ -299,6 +343,9 @@ def classify_failure(session: ServicingSession, exc: AvisAPIError, operation: st
               retryable=exc.retryable, reservation_id=session.reservation_id)
     if exc.code in ESCALATING_CODES:
         session.escalated = True
+        # A classified terminal failure IS a handoff. Reporting one while leaving every
+        # action tool usable is exactly the contradiction customers noticed.
+        session.handed_off = True
         session.escalation_reason = f"{operation} failed: {exc.code}"
         return {"ok": False, "escalate": True, "code": exc.code,
                 "customer_message": str(exc), "handoff": session.escalation_payload()}

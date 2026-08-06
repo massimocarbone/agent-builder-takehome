@@ -107,17 +107,25 @@ def test_card_last_four_withheld_until_verified():
     claim rather than proof. Enforced by omission: the model never receives the digits."""
     import avis_client
     from fixtures import reservation as fixture
+    calls = []
     orig = avis_client.get_reservation
-    avis_client.get_reservation = lambda rid: fixture()
+    avis_client.get_reservation = lambda rid: (calls.append(rid), fixture())[1]
     try:
         unverified = ServicingSession()
         out = _call(agent.lookup_reservation, unverified, reservation_id="AVS-48372915")
         assert out["card_last_four"] == "withheld until verified", out["card_last_four"]
 
+        # Realistic verified state: the SAME reservation is already loaded and verified.
+        # (verified_email with no reservation is unreachable — verification only happens
+        # when a write succeeds, which requires a loaded reservation.)
         verified = ServicingSession()
+        verified.reservation = fixture()
         verified.verified_email = "marcus.lee@example.com"
         out = _call(agent.lookup_reservation, verified, reservation_id="AVS-48372915")
         assert out["card_last_four"].isdigit(), out["card_last_four"]
+        # Guards the guard: if the stub is never reached this test is silently exercising
+        # the live API instead of the code path it claims to cover (audit #8).
+        assert calls, "stub never intercepted — test was hitting the real API"
     finally:
         avis_client.get_reservation = orig
 

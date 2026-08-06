@@ -27,7 +27,8 @@ from agents import Agent, RunContextWrapper, Runner, SQLiteSession, function_too
 import config  # noqa: E402
 import extend_flow  # noqa: E402
 import kb  # noqa: E402
-from avis_client import AvisAPIError, get_reservation  # noqa: E402
+import avis_client  # noqa: E402
+from avis_client import AvisAPIError  # noqa: E402
 from session import ServicingSession, log_event  # noqa: E402
 
 # --- Tools --------------------------------------------------------------------------
@@ -67,11 +68,11 @@ def lookup_reservation(ctx: RunContextWrapper[ServicingSession], reservation_id:
     if blocked := _blocked(session):
         return blocked
     try:
-        reservation = get_reservation(reservation_id.strip().upper())
+        reservation = avis_client.get_reservation(reservation_id.strip().upper())
     except AvisAPIError as exc:
         return extend_flow.classify_failure(session, exc, "lookup_reservation")
 
-    session.reservation = reservation
+    session.load_reservation(reservation)
     log_event("reservation_loaded", reservation_id=reservation.get("reservation_id"),
               status=reservation.get("status"), membership=reservation.get("membership_status"))
 
@@ -180,7 +181,7 @@ def escalate_to_human(ctx: RunContextWrapper[ServicingSession], reason: str,
     # which is the exact friction this handoff exists to prevent.
     if not session.reservation and reservation_id.strip():
         try:
-            session.reservation = get_reservation(reservation_id.strip().upper())
+            session.load_reservation(avis_client.get_reservation(reservation_id.strip().upper()))
         except AvisAPIError as exc:
             log_event("escalation_lookup_failed", reservation_id=reservation_id,
                       code=exc.code)
@@ -295,6 +296,7 @@ def run_turn(user_input: str, servicing_session: ServicingSession, history: SQLi
     their card details. Same principle as the API client: back off and retry the transient
     thing, surface the terminal thing.
     """
+    servicing_session.turn += 1
     servicing_session.record("customer", user_input)
     for attempt in range(1, max_attempts + 1):
         try:
