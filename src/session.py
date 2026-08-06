@@ -77,12 +77,34 @@ def redact_text(text: str) -> str:
 
 
 @dataclass
+class PendingCancellation:
+    """A cancellation estimate the customer has been shown, awaiting confirmation.
+
+    Same gate semantics as PendingQuote: staged on one turn, committable only on a later
+    one, single-use. The figures are policy-derived ESTIMATES (there is no cancel quote
+    endpoint), which is why the actual API outcome is compared against them post-write.
+    """
+
+    branch: str
+    penalty_estimate: float
+    refund_estimate: float
+    prepaid: float
+    currency: str
+    citation: dict
+    caveats: list[str]
+    quoted_on_turn: int = 0
+    consumed: bool = False
+    quoted_at: float = field(default_factory=time.monotonic)
+
+
+@dataclass
 class ServicingSession:
     """Per-conversation state. One instance per customer interaction."""
 
     reservation: dict | None = None
     verified_email: str | None = None
     pending_quote: PendingQuote | None = None
+    pending_cancellation: PendingCancellation | None = None
     failed_verifications: int = 0
     escalated: bool = False
     escalation_reason: str | None = None
@@ -122,6 +144,7 @@ class ServicingSession:
                           cleared_quote=self.pending_quote is not None)
             self.verified_email = None
             self.pending_quote = None
+            self.pending_cancellation = None
             self.failed_verifications = 0
         self.reservation = reservation
 
@@ -161,6 +184,8 @@ class ServicingSession:
             "email_verified": bool(self.verified_email),
             "current_return_datetime": reservation.get("dates", {}).get("current_return_datetime"),
             "pending_quote": asdict(self.pending_quote) if self.pending_quote else None,
+            "pending_cancellation": (asdict(self.pending_cancellation)
+                                     if self.pending_cancellation else None),
             "collected_context": self.collected_context,
             "transcript": self.transcript,
         }

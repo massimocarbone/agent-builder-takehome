@@ -49,6 +49,14 @@ ALTERNATIVE_QUOTE_BUDGET_S = float(os.environ.get("ALTERNATIVE_QUOTE_BUDGET_S", 
 # customer rather than silently charged (DECISIONS.md §5, quote staleness).
 QUOTE_TTL_SECONDS = float(os.environ.get("QUOTE_TTL_SECONDS", "120"))
 
+# If the actual cancellation outcome is ADVERSE to the customer versus the estimate they
+# agreed to by at least this much (higher penalty or smaller refund), escalate to a human.
+# Asymmetric on purpose: a pleasant surprise is reported, not escalated — bothering a rep
+# with good news wastes the handoff. Kept low because the estimator matched the API to the
+# cent on every observed reservation; any real deviation means an unobserved policy branch,
+# which is exactly when a person should look. (DECISIONS.md §3, handoff rules.)
+CANCEL_VARIANCE_THRESHOLD_USD = float(os.environ.get("CANCEL_VARIANCE_THRESHOLD_USD", "1.00"))
+
 # Escalate after this many failed email verifications on a write.
 MAX_VERIFICATION_ATTEMPTS = int(os.environ.get("MAX_VERIFICATION_ATTEMPTS", "3"))
 

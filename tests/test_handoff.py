@@ -34,6 +34,8 @@ def test_hard_handoff_blocks_every_action_tool():
         (agent.quote_extension, {"new_return_datetime": "2026-06-12"}),
         (agent.confirm_extension, {"email": "marcus.lee@example.com",
                                    "cvv": "123", "billing_zip": "60601"}),
+        (agent.estimate_cancellation, {}),
+        (agent.confirm_cancellation, {"email": "marcus.lee@example.com"}),
     ]
     for tool, kwargs in cases:
         session = ServicingSession()
