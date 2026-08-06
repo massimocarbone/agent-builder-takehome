@@ -48,6 +48,26 @@ A starting point for the Avis rental-servicing agent take-home. **Start with [`B
    python src/agent.py
    ```
 
+## Tests
+
+Run the complete test suite with:
+
+```bash
+python -m pytest
+```
+
+The additional safety-regression tests are marked as strict expected failures while their
+corresponding production safeguards remain unimplemented. Pytest reports them as `XFAIL`;
+if a fix makes one pass, strict mode turns that unexpected pass into a failing result until
+the marker is removed and the test joins the normal regression suite.
+
+Run one file or one area while developing with, for example:
+
+```bash
+python -m pytest tests/test_cancel_flow.py
+python -m pytest -k cancellation
+```
+
 ## Then build
 
 Head to [`BRIEF.md`](BRIEF.md). Build the RAG foundation and escalation logic first, then

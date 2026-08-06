@@ -111,7 +111,7 @@ def test_null_datetime_rejected_at_boundary():
             assert "dates.current_return_datetime" in e.details["missing_fields"]
 
 
-def test_secrets_never_reach_the_log(tmp_check=None):
+def test_secrets_never_reach_the_log():
     import json as j
     with fake_transport([OK_WRITE]):
         avis_client.extend_reservation("AVS-48372915", "2026-06-12T15:00:00-05:00",
