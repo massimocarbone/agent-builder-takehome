@@ -95,6 +95,67 @@ insurance / damage waiver, pet policy, roadside assistance, child seat, holiday 
 Because retrieval *will* return something for these (see item 10), the meaningful
 assertion is at the **agent** level — that it declines — not at the retrieval level.
 
+### 17. The agent has no authoritative source for "today" — high severity
+**Where:** whole codebase. `datetime.now()` appears in exactly one place
+(`policy.py`, Cancel's 48h-window math) and is never surfaced to the model.
+
+Proven, not suspected: a completely fresh conversation with zero prior context, asked
+only "what is today's date?", answered **"June 21, 2024."** Real system time at the
+moment of the test: **August 5, 2026** — over two years off, in the wrong direction, a
+pure hallucination near the model's training cutoff.
+
+**A live human session (2026-08-05, pre-Cancel) shows the failure mode this produces in
+practice.** The customer told the bot "it's currently August 3" mid-conversation; asked
+directly afterward, the bot answered "August 3, 2026" — almost certainly parroting the
+customer's own unverified claim back as fact, not computing it. The same session nearly
+let a customer "extend" a reservation to a date that was still in the past relative to
+real time, because `extend_flow.build_quote` only validates the target against the
+*reservation's own stored return time*, never against real wall-clock time. It happened
+to get caught because the customer noticed and corrected themselves — the code did not
+catch it.
+
+Tested whether relative phrasing ("extend it by one more week from today") inherits the
+bad date: in that instance the model anchored on the reservation's own stored return
+date instead of its hallucinated "today," producing a correct result — but that's luck,
+not a guarantee. Nothing stops the model from reasoning off its invented June 2024 in a
+different phrasing, and Cancel's `policy.py` proves the fix is already known: it uses
+real `datetime.now()` internally for exactly this reason. Extend just never got the
+equivalent.
+
+**Fix:** (1) inject real `datetime.now()` into the agent's context so "what day is it"
+and relative-date reasoning ground out in a fact rather than a guess, and (2) add a
+floor to `extend_flow.build_quote` rejecting a target still before real now — the same
+rigor `policy.py` already has, just not yet shared. Not merely a demo-data cosmetic
+issue: this is "today" being effectively customer-suppliable, which is backwards for
+any date-sensitive business logic.
+
+### 18. A compound confirmation question can produce ambiguous consent
+**Where:** `src/agent.py` INSTRUCTIONS (cancel flow), observed live 2026-08-05
+(`AVS-99004050`).
+
+The customer asked to cancel; the next message was an unrelated garbled aside that
+looked enough like a reservation ID to trigger a failed lookup ("did you mean the
+original?"); the customer's reply — **"yeah do the original"** — was treated as full
+consent to cancel a real reservation. Structurally sound (the turn-boundary and
+staged-estimate gates were both satisfied), but the bot's own question had bundled two
+things into one ask — "confirm the reservation ID" and "confirm you want to cancel" —
+and "yeah do the original" answers the first far more clearly than the second. The
+customer's very next message, unprompted, was **"did i confirm cancel?"** — a live
+signal that even they weren't certain.
+
+This is the boundary our code-level gates cannot close on their own: they guarantee a
+turn passed and *some* reply was given, not that the reply was unambiguous affirmative
+consent to the specific, irreversible action at hand. Worth a prompt-level rule:
+never treat a reply to a compound or tangential question as consent on an irreversible
+action — split the question, or restate the specific ask ("just to confirm: cancel
+AVS-99004050, $53.99 penalty — yes or no?") before proceeding. Two minor, lower-severity
+notes from the same session: the bot re-displayed the customer's own already-verified
+email back to them mid-flow rather than requiring it retyped (harmless — same
+reservation, already verified — but worth a glance); and the disambiguation flow
+(cancel vs. early return) and the post-cancellation summary both performed correctly
+under real, confused human typing, which is good evidence the earlier disclosure fixes
+are holding under pressure.
+
 ---
 
 ---
