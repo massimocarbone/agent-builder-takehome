@@ -180,6 +180,38 @@ LLM-touching-money pattern the rest of the architecture exists to prevent. Inste
 deterministic policy function computes the figure, and the article is attached as the
 *citation* justifying it. Code can be unit-tested; a paraphrase cannot.
 
+**Built and verified as designed** (`src/kb.py`). IDF-damped term overlap, weighted
+toward title/category, times the authority multiplier; legacy-article suppression when a
+higher-authority match exists in the same category. One deviation from the original plan:
+plain term-frequency scoring let "return" — present in nearly every article — swamp the
+discriminating word in a query like "return early," so IDF weighting was added after the
+first test run failed honestly. Regression tests assert the grace-period trap under four
+phrasings and pass; live conversation confirmed the agent answers 30 minutes (official),
+never the legacy 2 hours, and cites `kb_fee_02` for the $29 fee rather than inventing a
+reason for it.
+
+### Testing strategy: fixtures from real payloads, never invented from scratch
+
+Several cancel-policy branches (pre-pickup cancellation, non-refundable rates, pay-at-
+counter) are unreachable through any test reservation — see §5. Rather than write flow
+logic that would ship having never executed, `tests/fixtures.py` builds test data by
+capturing a live API response once and mutating only the field the branch under test
+needs (e.g. shifting `pickup_datetime` into the future for the pre-pickup branch). A
+fixture invented from imagination tests the author's assumptions, not the system.
+
+Two deliberately separate seams: patching `avis_client.requests.request` exercises the
+*real* client — retries, backoff, idempotency headers — against a scripted transport;
+patching a client function directly skips the client and tests flow logic alone. Mixing
+these up produces a test that looks like coverage but proves nothing — this happened
+twice in this build (a handoff-guard test that asserted on internal state instead of
+calling the tool it claimed to test; a card-disclosure test whose stub was never reached
+because `agent.py` had imported the function by bare name, so patching the module
+attribute it was defined on did nothing). The second was only caught by an external
+audit. The standing discipline going forward: **when a test patches something, assert
+that the patch was actually reached**, not just that the final outcome looks right — a
+mutation check (deliberately break the guard, confirm the test then fails) is cheap
+insurance against writing a test that would pass regardless.
+
 ---
 
 ## 3. Cross-cutting design rules
@@ -205,6 +237,34 @@ gate has a second, independent lock that isn't in the model's control either.
 
 Money-touching logic therefore lives in plain Python (`extend_flow.py`), separate from the
 agent definition, so it can be read, reviewed, and tested with no LLM in the loop.
+
+**Consent is measured in conversation turns, not tool calls.** An external audit found
+that nothing stopped the model from calling `quote_extension` then `confirm_extension`
+inside a single run — before the customer had seen a single word of the total. The gate
+originally checked "does a quote exist," which "does a quote exist that the customer
+replied to" is a different, stronger claim. Fix: `ServicingSession` counts turns, each
+`PendingQuote` records the turn it was staged on, and `commit_extension` refuses unless
+the current turn is strictly later. This encodes what "the customer agreed" structurally
+means — the quote went out, control returned to the human, and they replied — rather than
+a wall-clock proxy (e.g. "quote must be N seconds old") that a fast customer or a slow
+test would each trip in the wrong direction. Consequence for future work: **every write
+flow, Cancel included, must quote and charge on separate turns.** This is now a load-
+bearing constraint on the architecture, not an implementation detail.
+
+**A quote is single-use.** `PendingQuote.consumed` is set on a successful write and
+checked before the next one. Without it, a retried tool call or a replayed turn after a
+provider hiccup could charge twice — each write mints a fresh `Idempotency-Key`, so the
+API's own replay protection (§2, idempotency) does not cover a second *logical* charge,
+only a retried *identical* one.
+
+**Verification and a staged quote are scoped to one reservation, not one conversation.**
+Switching reservations mid-conversation used to carry `verified_email`, `pending_quote`,
+and `failed_verifications` across the switch — so proving you knew reservation A's email
+could disclose reservation B's card digits, and a quote priced for A could be committed
+against B. `ServicingSession.load_reservation()` clears all three whenever the incoming
+reservation id differs from the one already loaded. `handed_off` deliberately does **not**
+reset on a switch — a terminated conversation must not reopen just because the caller
+names a different booking.
 
 ### Identity verification
 
@@ -357,6 +417,59 @@ Explicit conditions where the agent stops and escalates rather than proceeding:
 - **Ambiguous intent** after several turns; **any terminal API error on a write**
   (`PAYMENT_DECLINED`, `RESERVATION_NOT_ACTIVE`, etc.) that the agent can't resolve
   by re-collecting input.
+
+**Escalation is a real terminal state, enforced structurally.** A live human-run session
+on 2026-08-05 caught the agent announcing a handoff and then answering the customer's
+question itself 19 seconds later. The cause: `escalated` was written in three places and
+read in none — it was a sentence the model narrated, not a state anything checked. Fixed
+by splitting escalation into two kinds:
+
+- **`hard`** (verification lockout, terminal API error, an action this agent must not
+  take — cancel, upgrade, location change) sets `session.handed_off = True`. Every action
+  tool checks this before doing anything and refuses if set; the refusal is structural
+  (`_blocked()` in `agent.py`), not a instruction the model is trusted to follow. A
+  follow-up audit found two more paths that set `escalated` but not `handed_off`
+  (`classify_failure` and the verification lockout itself) — same bug, reached a
+  different way; both now set the terminal flag directly.
+- **`assistive`** (e.g. "the customer can't find their reservation ID") stays revocable.
+  In the same 2026-08-05 session the customer found their ID one turn after escalating —
+  hard-terminating there would have been its own bad experience.
+
+**The handoff payload carries the verbatim transcript, not just the model's own summary.**
+Given the model has repeatedly invented details with full confidence (see the fabricated
+late-fee reason and the fabricated "Avis policy" on disclosure, both below), its own
+summary of the conversation is the least trustworthy artifact available to hand a human.
+Card codes and card-like digit runs are scrubbed on the way in — customers type CVVs
+directly into chat.
+
+### The agent's remit is answering, not just acting — and never inventing why
+
+A live session on 2026-08-05 found the agent refusing to state a customer's own return
+date ("I am only permitted to help extend your rental... according to Avis policy"),
+then disclosing it two turns later once the customer said "extend." Investigation found:
+zero of the 30 knowledge-base articles mention any disclosure or verification-gating
+policy, `search_policy` was never called during the exchange, and the agent's own
+instructions at the time already permitted exactly what it refused. **The refusal was
+the hallucination; the eventual disclosure was correct.**
+
+Root cause: the agent had exactly one sanctioned capability (extend), so any other
+request fell into a vacuum the model filled with an invented rule. Fix was to state
+**affirmative permission** rather than only prohibition — vehicle, dates, locations,
+daily rate, amount charged, membership, and status may always be shared for a loaded
+reservation; only the card's last four requires verification — and to forbid describing
+the agent's own limits as "Avis policy" unless a retrieved article actually says so.
+This generalizes the standing rule from "never invent a price" to "never invent a
+reason": the same session found the agent explaining a real $29 late fee with a
+completely fabricated 24-hour rule. Both are now covered by one instruction: an
+explanation is only as trustworthy as the number it explains, and needs the same
+sourcing discipline.
+
+**Consequence for scope.** The fix was not "make the prompt stricter" — it was "give the
+agent something legitimate to do with every question it's asked." A rigid, single-verb
+agent didn't produce safety; it produced hallucinated scope. The gates that actually
+matter (quote-before-charge, verification-before-write, turn-boundary consent) are
+enforced in code and hold regardless of how broad the agent's conversational remit is —
+so widening what it can *discuss* costs nothing the architecture depends on.
 
 ### Not hard-coding to test reservations
 
@@ -517,6 +630,37 @@ logs are written.
 
 ## 8. Changelog
 
+- **2026-08-06** — External audit against `main` (post-handoff-fix) found nine issues,
+  independently reproduced before fixing, each with a regression test; the four new
+  guards are mutation-verified. Highest severity: switching reservations mid-conversation
+  leaked verification and a staged quote across bookings (§3, confirmation gate); terminal
+  API failures set `escalated` but not the enforced `handed_off` flag, the same bug as the
+  2026-08-05 incident reached through a different path; and a handoff test's stub was
+  never reached because `agent.py` had imported a client function by bare name — the third
+  instance of a test that doesn't test what it claims (§2, testing strategy). Also closed:
+  quotes were chargeable twice (no consumed flag), nothing enforced a turn boundary
+  between quote and charge (§3), an unpriced quote could still be confirmed, a stored
+  unparseable datetime crashed past validation, and a threadpool fix for bounding
+  speculative-quote latency silently didn't work on first attempt (`with` blocks on
+  `wait=True` regardless of a per-future timeout) — caught by the timing test, not by
+  inspection. 52 tests across 6 files green; live happy path re-verified end to end.
+- **2026-08-05** — Built the knowledge base (`src/kb.py`) as designed: IDF-damped
+  authority-ranked retrieval, legacy-article suppression, provenance logging. One
+  deviation — added IDF weighting after plain term frequency let "return" swamp
+  discriminating terms in longer queries. Built the fixture/test harness
+  (`tests/fixtures.py`, `tests/test_client.py`) after probing already-merged flow code
+  with malformed payloads found two live crashes (`KeyError` on a reservation missing
+  `dates`, `TypeError` on a null return datetime); added `validate_reservation()` at the
+  client boundary so malformed payloads become a graceful escalation instead of an
+  exception. A second unscripted human session found the agent announcing a handoff and
+  then answering the question itself 19 seconds later, and fabricating an access-control
+  policy ("according to Avis policy...") that exists nowhere in the knowledge base and
+  contradicts the agent's own instructions — see §3, handoff-to-human and the agent's
+  remit. Both fixed structurally: `handed_off` as an enforced terminal state split into
+  hard/assistive, and affirmative-permission instructions replacing a single-verb remit
+  that left every other request to be answered by invention. A follow-up bug sweep before
+  Cancel found and fixed a card-digit disclosure to an unverified caller and six of eight
+  malformed customer datetimes escaping as raw `ValueError`.
 - **2026-08-05** — Knowledge-base and cancel design settled ahead of building either.
   Retrieval will be lexical with authority/recency ranking rather than embeddings, and
   will never source a number that drives money — a deterministic policy function computes
