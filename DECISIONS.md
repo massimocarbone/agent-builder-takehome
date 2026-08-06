@@ -385,6 +385,57 @@ reviewer reads that reasoning either way. What changed is not "do we understand
 embeddings," it's "does *this* submission need them," and the answer, checked rather
 than assumed, is no.
 
+### Built as decided (`feat/librarian-retrieval`)
+
+All of the above shipped, in the shape the corrected plan specified. What's worth
+recording beyond "done":
+
+**The Phase 0 gap was demonstrated live before fixing.** `kb.search("refill the tank")`
+returned legacy `kb_fee_05` unsuppressed — the only above-floor match in its category,
+so the relative rule had nothing to compare against and never fired. Exactly the
+predicted mechanism, found on the first probe for a solo-match query. Fixed with
+`_superseded_categories()` (computed from the corpus, fires unconditionally), the
+relative rule retained behind it as the runtime net, and the corpus-property test
+guarding the precondition.
+
+**The seam refactor was verified the only way that counts:** the entire pre-existing
+suite green with zero test edits. `lexical_candidates()` proposes ordered ids;
+`_finalize()` — id validation, both suppression layers, cap, confidence, provenance,
+and body hydration by id — runs identically for every producer. The named guarantee
+(output contains only verbatim corpus content; a producer can propose a wrong article
+but cannot invent article text) has its own test, fed deliberately hostile candidates.
+
+**The librarian is a function, not an agent, in the code and not just the doc.** One
+`chat.completions` call, `temperature=0`, JSON out, `max_retries=0` — the OpenAI
+client's default internal retries would have spent the whole 3s budget before our
+fallback ran; falling back to lexical *is* the retry policy. The never-raise contract
+is tested for the specific case that matters: a provider-shaped failure (rate limit,
+timeout) raised inside the nested call comes back through `search_policy` as a served
+lexical result, never as an exception `run_turn`'s outer retry could see and act on by
+re-running tools that already succeeded.
+
+**First live eval: 18/20, zero call failures, zero hallucinated ids** (~1–2s per call,
+`gpt-4.1-mini`). All five no-coverage cases hit — "do you cover insurance or a damage
+waiver" and "what is your pet policy," the two queries this whole thread started from,
+now come back as an affirmative *"outside what Avis publishes policy on"* rather than a
+low-confidence near-miss. The zero-overlap paraphrases ("can I keep the auto a couple
+more days") also hit, which lexical scoring structurally cannot do.
+
+**The best finding was a miss.** On "what is the grace period for returns" the
+librarian *proposed the legacy article* — `kb_fee_01`, authority plainly labelled in
+its index — alongside the official one. The model fell into the very trap this
+knowledge base was seeded with, on the first eval run, and the deterministic finalizer
+suppressed it so the served answer stayed official-only. That is the entire layering
+argument (producers propose, deterministic code disposes) demonstrated on real data:
+LLM judgment failed exactly where §2 predicted LLM judgment fails, and the gate held.
+If the librarian had been allowed to own authority arbitration, this would have been a
+90-minutes-wrong answer to a customer.
+
+**Default stays `lexical` for the graded submission.** The librarian is opt-in
+(`shadow` to gather the comparison data, `librarian` to serve), per the §4 flag
+discipline: commercially-or-operationally unvalidated behavior defaults off, with the
+measurement machinery built in rather than promised.
+
 ### Testing strategy: fixtures from real payloads, never invented from scratch
 
 Several cancel-policy branches (pre-pickup cancellation, non-refundable rates, pay-at-
@@ -835,6 +886,7 @@ I'd want to see for each."
 | `FLEXIBLE_DATE_ALTERNATIVES_MODE` | On extend, also quote nearby return dates and surface cheaper options. Three modes — `off` / `shadow` / `on` | `off` | Extension length delta; conversion rate; CSAT |
 | `IN_FLOW_UPGRADE_OFFER` | Surface membership upgrade (standard → Avis Preferred) inside extend/modify where it would offset costs (e.g. late-fee exemption); acceptance escalates to a human with full flow context | Off | Offer→accept rate; complaint rate |
 | `CANCEL_RETENTION_PROMPT` | Offer a date change once before processing a cancellation | Off | Save rate vs. abandonment/trust signals |
+| `KB_RETRIEVAL_MODE` | Knowledge-base candidate producer: deterministic lexical scoring, or the librarian classification call (§2). Three modes — `lexical` / `shadow` / `librarian` — three for the same reason as the flexible-date flag: the shadow counterfactual costs a real LLM call per policy question | `lexical` | Shadow disagreement rate plus a hand-review of the disagreements; librarian failure + hallucination rates from `kb_retrieval_comparison`; p95 added latency. Eval baseline to beat: 18/20, 0 failures (tests/eval_librarian.py) |
 
 ### Flexible-date alternatives (detail)
 
@@ -985,6 +1037,23 @@ logs are written.
 
 ## 8. Changelog
 
+- **2026-08-06** — Built the librarian (`feat/librarian-retrieval`, Phases 0–5).
+  Phase 0 first and standalone: demonstrated the suppression gap live ("refill the
+  tank" served legacy `kb_fee_05` — a solo match its relative rule couldn't catch),
+  fixed with corpus-computed absolute suppression plus a corpus-property test.
+  Phase 1: retrieval split into swappable candidate producers behind a deterministic
+  finalizer, verified by the whole pre-existing suite passing with zero test edits;
+  the finalizer's verbatim-content guarantee is a named test. Phases 2–3:
+  `src/librarian.py` as a single non-agentic classification call (never raises;
+  `max_retries=0` because lexical fallback IS the retry policy) behind
+  `KB_RETRIEVAL_MODE` (`lexical` default / `shadow` / `librarian`), with every attempt
+  — including failures — logged to `kb_retrieval_comparison`. Phase 4: 15 blocking
+  wiring tests (six guards mutation-verified), including the nested-failure isolation
+  test (a provider error inside the tool must never reach `run_turn`'s outer retry),
+  plus a 20-case scored eval excluded from pytest. First live eval: 18/20, 0 failures,
+  0 hallucinated ids, all five no-coverage cases hit — and one miss that proves the
+  architecture: the librarian proposed the legacy grace-period article and the
+  finalizer suppressed it (§2, "Built as decided"). 103 tests green.
 - **2026-08-06** — Reopened the librarian-vs-embeddings decision after two checks.
   Clarified that modern (transformer-based) embeddings are contextual, not the
   fixed-per-word lexical index older Word2Vec-style embeddings were — they would likely
