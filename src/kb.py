@@ -124,28 +124,53 @@ def _score(query_tokens: list[str], article: dict) -> float:
     return raw * AUTHORITY_WEIGHT.get(article["authority"], 0.5)
 
 
-def search(query: str) -> list[dict]:
-    """Return up to TOP_N relevant articles, best first, with provenance logged.
+@lru_cache(maxsize=1)
+def _article_by_id() -> dict[str, dict]:
+    return {a["id"]: a for a in _corpus()}
 
-    Empty list means "no policy found" — the caller must say so, not improvise.
+
+def lexical_candidates(query: str) -> list[str]:
+    """The default candidate producer: IDF-damped lexical scoring, ordered ids.
+
+    One of possibly several producers behind ``_finalize`` — the librarian is another,
+    embeddings a documented future third. A producer only ever *proposes ids*; every
+    safety property (suppression, authority, verbatim content) lives in the finalizer,
+    which runs identically regardless of who proposed.
     """
     query_tokens = _tokens(query)
     if not query_tokens:
         return []
-
     scored = [(s, a) for a in _corpus() if (s := _score(query_tokens, a)) >= SCORE_FLOOR]
     # Sort: score desc, then authority desc, then recency desc.
     scored.sort(key=lambda p: (p[0], AUTHORITY_WEIGHT.get(p[1]["authority"], 0.5),
                                p[1]["last_updated"]), reverse=True)
+    return [a["id"] for _, a in scored]
+
+
+def _finalize(query: str, candidate_ids: list[str], source: str = "lexical") -> list[dict]:
+    """The deterministic gate every producer's candidates pass through.
+
+    Named guarantee: **the output contains only verbatim corpus content.** Candidates
+    arrive as ids; anything not in the corpus is dropped and counted, and every title
+    and body in the result is hydrated from the corpus by id — never taken from what a
+    producer supplied. A hallucinating (or compromised) producer can propose a wrong
+    article; it structurally cannot invent article *content*. Same division as the money
+    flows: the model proposes, deterministic code disposes.
+    """
+    by_id = _article_by_id()
+    unknown = [i for i in candidate_ids if i not in by_id]
+    seen: set[str] = set()
+    articles = [by_id[i] for i in candidate_ids
+                if i in by_id and not (i in seen or seen.add(i))]
 
     # Conflict suppression, two layers. "absolute" reads the corpus and fires whether or
     # not anything else matched — the fix for the solo-legacy-match gap (docstring on
     # _superseded_categories). "relative" is the original rule, comparing against this
-    # query's own matches; while the corpus-property test holds (every legacy article's
+    # candidate set; while the corpus-property test holds (every legacy article's
     # category has higher-authority coverage) it is provably redundant, and it stays as
     # a runtime net against a corpus hand-edited into deployment without the suite
     # re-running. The stale grace-period article dies here, every time.
-    categories_covered = {a["category"] for _, a in scored if a["authority"] != "legacy"}
+    categories_covered = {a["category"] for a in articles if a["authority"] != "legacy"}
 
     def _suppressed_by(article: dict) -> str | None:
         if article["authority"] != "legacy":
@@ -157,10 +182,8 @@ def search(query: str) -> list[dict]:
         return None
 
     suppressed = [{"id": a["id"], "rule": rule}
-                  for _, a in scored if (rule := _suppressed_by(a))]
-    results = [(s, a) for s, a in scored if not _suppressed_by(a)]
-
-    top = results[:TOP_N]
+                  for a in articles if (rule := _suppressed_by(a))]
+    top = [a for a in articles if not _suppressed_by(a)][:TOP_N]
 
     # Thin match: the whole result rests on ONE query term. Sometimes that's right ("how
     # do I get my money back if I cancel" — only "cancel" is in our vocabulary, and the
@@ -169,19 +192,30 @@ def search(query: str) -> list[dict]:
     # two are lexically identical, so no scoring rule separates them without dropping the
     # good one — see DECISIONS.md §2. Rather than pick a side, say which kind of match
     # this is and let the answer be hedged accordingly.
-    hits = [{"article": a, "score": s, "low_confidence": len(_matched(query_tokens, a)) <= 1}
-            for s, a in top]
+    query_tokens = _tokens(query)
+    hits = [{"article": a, "low_confidence": len(_matched(query_tokens, a)) <= 1}
+            for a in top]
 
-    log_event("kb_retrieval", query=query,
+    log_event("kb_retrieval", query=query, source=source,
               returned=[{"id": h["article"]["id"], "authority": h["article"]["authority"],
                          "last_updated": h["article"]["last_updated"],
-                         "score": round(h["score"], 2),
                          "low_confidence": h["low_confidence"]}
                         for h in hits],
-              suppressed=suppressed)
+              suppressed=suppressed,
+              unknown_ids=unknown)
 
     return [{"id": h["article"]["id"], "title": h["article"]["title"],
              "authority": h["article"]["authority"],
              "last_updated": h["article"]["last_updated"], "body": h["article"]["body"],
              "low_confidence": h["low_confidence"]}
             for h in hits]
+
+
+def search(query: str) -> list[dict]:
+    """Return up to TOP_N relevant articles, best first, with provenance logged.
+
+    Empty list means "no policy found" — the caller must say so, not improvise.
+    """
+    if not _tokens(query):
+        return []
+    return _finalize(query, lexical_candidates(query), source="lexical")
