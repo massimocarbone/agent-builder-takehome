@@ -1021,9 +1021,12 @@ is exactly why it's flagged and shadow-logged rather than assumed.
   scaffolding.
 - **Commit and push frequently** — small commits, so there's always a good point to fall
   back to if a feature fails, and the history tells the story of the build.
-- **No worktrees** — they pay off for simultaneous work on multiple branches; this build
-  is one person working sequentially. Revisit only if we parallelize (e.g. building
-  Modify while reviewing Cancel).
+- **Worktrees only when parallel work makes them pay for themselves.** The initial build
+  was sequential, so a second checkout would have added coordination without throughput.
+  That changed when librarian development and testing-infrastructure experiments ran at
+  the same time: the test work moved to isolated worktrees and layered branches
+  (`codex/test-run-artifacts` → `codex/test-harness-experiments`), leaving the feature
+  checkout and its untracked files untouched. In this phase, both are in use.
 - DECISIONS.md is updated whenever rationale changes, committed alongside the change.
 
 ---
@@ -1035,7 +1038,89 @@ logs are written.
 
 ---
 
-## 8. Changelog
+## 8. Final testing & submission readiness (2026-08-06)
+
+### A. Shadow-mode data collection and flag-readiness decisions
+
+Every flag in §4's table is documented with a "metric that would justify turning it on."
+None have been measured at scale yet. The comprehensive testing pass will run each in
+shadow mode against realistic, adversarial query/session volumes:
+
+- `KB_RETRIEVAL_MODE` (lexical/shadow/librarian): 150–200 customer queries (typos, terse,
+  multi-intent, paraphrase with zero vocabulary overlap, known homonym traps, uncovered
+  topics). Compare lexical's served output against librarian's finalized would-be output
+  (post-`_finalize`, after suppression and hydration), not raw proposal. Track agreement
+  rate, hallucination count, latency p50/p95/max, no_coverage precision, and hand-review
+  disagreement samples to determine if serve side is right. Recommendation: stay off unless
+  disagreement rate is >90% AND the majority of samples favor the librarian.
+  
+- `FLEXIBLE_DATE_ALTERNATIVES_MODE`: Shadow-run alternative-date quoting concurrently,
+  log both without surfacing, measure cost/availability deltas. Recommendation: stay off
+  unless alternatives are cheaper or available >40% of the time.
+  
+- `IN_FLOW_UPGRADE_OFFER` and `CANCEL_RETENTION_PROMPT`: Scripted multi-turn conversations
+  (via `dev/run_local.py` sandbox) simulating realistic session patterns, count how often
+  trigger conditions fire. Recommendation: these are UI/UX levers, not safety gates; ship
+  off and let ops evaluate live if the ask is ever made.
+
+### B. Comprehensive testing plan (7-track, run independent pieces in parallel)
+
+1. **Shadow-mode data** (A above) — drives flag decisions.
+2. **High-volume property/state-machine testing** — run `codex/test-harness-experiments`
+   with `max_examples` and `stateful_step_count` raised to 500+/100×100, overnight,
+   watching for any shrinkable failing case. Highest-leverage bug finder available.
+3. **Adversarial conversational** — scripted multi-turn: prompt injection via reservation
+   fields, demanding "just charge it", double-confirm one extension, mixed extend+cancel
+   intent, asserting nonexistent policies, testing handoff boundaries and reversals.
+4. **Sandbox scenario end-to-end** — 20–30 full multi-turn conversations each through
+   all 7 dev/ scenarios (active mid-rental, preferred, pre-pickup free/penalty, overdue,
+   pay-at-counter, cancelled). Real tone/hallucination/gate-leak testing that function-
+   level checks cannot catch.
+5. **Mutation testing on money code** — break each safety invariant in `policy.py`,
+   `extend_flow.py`, `cancel_flow.py`, `kb.py`'s suppression one at a time; confirm
+   a test dies for each. Anything with no failing test is a gap.
+6. **Concurrency/load sanity** — SQLite session store and JSONL logs under concurrent
+   conversations or reused session IDs. Low risk, worth checking.
+7. **Finalization checklist** — README commands verbatim, env.example complete,
+   DECISIONS.md §4 flags table and §8B plan are both updated with final measurements
+   and decisions, all flags default to graded values in src/.
+
+### C. Decision record
+
+After the testing pass, update this section with measurements and per-flag decisions:
+
+| Flag | Measured | Decision | Evidence |
+|---|---|---|---|
+| `KB_RETRIEVAL_MODE` | TBD | TBD | TBD |
+| `FLEXIBLE_DATE_ALTERNATIVES_MODE` | TBD | TBD | TBD |
+| `IN_FLOW_UPGRADE_OFFER` | TBD | TBD | TBD |
+| `CANCEL_RETENTION_PROMPT` | TBD | TBD | TBD |
+
+---
+
+## 9. Changelog
+
+- **2026-08-06** — Testing infrastructure and comprehensive final-pass plan. Merged the
+  librarian to `main`, then turned to test tooling for the final evaluation. Built
+  `dev/` — an offline sandbox (patches the client-function seam for speed) with synthetic
+  reservations computed relative to real wall-clock time, covering states the six real
+  test accounts can't reach (genuinely mid-rental, pre-pickup, cancelled). Verified
+  end-to-end with live model. Opened [PR #13](https://github.com/massimocarbone/agent-builder-takehome/pull/13)
+  `codex/test-harness-experiments` — Hypothesis property tests + a rule-based state
+  machine exercising the session's money-moving invariants, plus isolated per-run test
+  artifacts with contextvars-based correlation IDs (`run_id`/`test_id`/`conversation_id`/
+  `turn_id`/`operation_id`), centralized redaction, and secret scanning. (PR #12
+  `codex/test-run-artifacts` is a strict subset; will close as superseded once #13
+  merges.) Opened [PR #14](https://github.com/massimocarbone/agent-builder-takehome/pull/14)
+  `chore/local-sandbox` — the `dev/` sandbox committed for portability. All unmerged,
+  `main` remains clean at librarian merge as a known-good return point. Planned comprehensive
+  testing pass (§8B below): shadow-mode data collection at scale for every feature flag
+  currently off (KB_RETRIEVAL_MODE, FLEXIBLE_DATE_ALTERNATIVES_MODE, IN_FLOW_UPGRADE_OFFER,
+  CANCEL_RETENTION_PROMPT) to gather evidence for "stay off" vs "flip default" decisions;
+  property/state-machine testing at high example count for bug-finding; adversarial/
+  red-team conversational testing; multi-turn sandbox scenarios; mutation testing on
+  core money code; concurrency stress-check; finalization checklist (README accuracy,
+  env.example completeness, DECISIONS.md updates, flag defaults verified).
 
 - **2026-08-06** — Built the librarian (`feat/librarian-retrieval`, Phases 0–5).
   Phase 0 first and standalone: demonstrated the suppression gap live ("refill the

@@ -265,41 +265,63 @@ the live session. Item B below is unchanged by any of this.
 
 ---
 
-## Planned for the final session (2026-08-06)
+## Final testing phase (2026-08-06 and ongoing)
 
-Last dedicated hour: **stress testing and trying to break the system**, plus evaluating
-upsell logic. Recording scope here so the session starts with a plan rather than a warm-up.
+The librarian work (Phases 0–5, PR #11, merged to main) and observability infrastructure
+(codex branches #12/#13, sandbox #14) are complete. The **comprehensive testing pass**
+now runs to gather evidence for flag-readiness decisions and catch any remaining bugs.
 
-### A. Upsell evaluation — the gap to close first
-`_upgrade_offer()` currently fires in **one** place: `extend_flow.build_quote`, and only
-when a standard member is being charged a real late fee. It is **not wired into Cancel at
-all** (verified). So the scenario named for evaluation — *"a customer cancelling to avoid
-late fees"* — currently gets no offer, which is exactly the case where a membership
-upgrade is most relevant: Preferred members are exempt from late fees (`kb_pref_02`), so
-someone cancelling *because of* a late fee may be better served upgrading and keeping the
-booking.
+Detailed scope is in DECISIONS.md §8A and §8B. Tools available:
 
-Scope to evaluate (all behind `IN_FLOW_UPGRADE_OFFER`, still default off, shadow-logged):
-- Wire the offer into the Cancel path where the customer's stated motive is fee avoidance.
-- Confirm the handoff carries **both** the upgrade intent and the pending change, so one
-  representative finishes both in a single interaction (the original design intent — the
-  bot never calls `/customers/{id}/upgrade` itself).
-- Watch for the failure mode that matters: an upsell that reads as an **obstacle** to
-  cancelling. Offer once, accept "no" immediately, never gate the cancellation on it.
-  This is the same restraint rule as `CANCEL_RETENTION_PROMPT`, and the trust cost of
-  getting it wrong is higher than the revenue upside of getting it right.
+- `dev/run_local.py` — interactive offline sandbox, real agent/prompt/gates against
+  synthetic reservations that real accounts cannot reach (genuinely mid-rental, pre-pickup,
+  cancelled, etc.).
+- `codex/test-harness-experiments` (PR #13) — Hypothesis property tests and rule-based
+  state machine; high-volume runs will find edge cases. Also provides isolated per-run
+  test artifacts with correlation IDs and centralized redaction.
+- `codex/test-run-artifacts` (PR #12) — subset of #13; close as superseded after #13
+  merges.
 
-### B. Stress-test targets (highest value first)
-1. **Consent boundaries** — the class our code gates provably cannot close (#18). Compound
-   questions, mid-sentence reversals, "wait no", sarcasm, consent given then withdrawn.
-2. **Date reasoning** — now that time is grounded (#17), attack it: relative dates
-   ("next Tuesday"), ambiguous ones ("the 20th"), DST/timezone edges, far-future targets.
-3. **Cross-reservation state** — switching reservations mid-flow, mixing IDs, retrying
-   after a switch. The isolation guard is new (audit #1) and lightly exercised live.
-4. **Handoff terminality** — requests after a hard handoff, arguing with it, new
-   reservation IDs post-handoff.
-5. **Hallucination pressure** — demand reasons for fees, invent policies and ask for
-   confirmation, ask about uncovered topics (insurance, pets) where retrieval returns
-   plausible-but-wrong articles (#10).
-6. **Adversarial identity** — probing reservation IDs, claiming employee authority,
-   guessing emails to the lockout boundary.
+### Shadow-mode data collection (runs concurrently)
+
+**Target:** evidence for whether `KB_RETRIEVAL_MODE`, `FLEXIBLE_DATE_ALTERNATIVES_MODE`,
+`IN_FLOW_UPGRADE_OFFER`, and `CANCEL_RETENTION_PROMPT` should stay off or flip default
+before submission.
+
+- **KB_RETRIEVAL_MODE**: 150–200 realistic customer queries, stratified by category/homonym/
+  uncovered/paraphrase. Compare lexical served vs. librarian finalized; track agreement,
+  hallucination, latency, no_coverage precision. Decision rule: flip to shadow/librarian
+  only if disagreement is >90% AND hand-review favors the librarian.
+  
+- **FLEXIBLE_DATE_ALTERNATIVES_MODE**: Shadow-run alternative-date quoting in parallel,
+  measure cost/availability deltas without surfacing. Decision: stay off unless
+  alternatives are cheaper/available >40% of the time.
+  
+- **IN_FLOW_UPGRADE_OFFER** / **CANCEL_RETENTION_PROMPT**: Scripted multi-turn conversations
+  via sandbox, count trigger frequencies. Both are UI/UX levers, not safety gates — expect
+  to stay off for submission; ops decides live if they're ever used.
+
+### Comprehensive testing tracks (run independent pieces in parallel)
+
+1. **Property/state-machine at scale** — raise `max_examples`/`stateful_step_count` to
+   500+/100×100, overnight, looking for shrinkable failing cases.
+2. **Adversarial conversational** — scripted multi-turn: prompt injection, double-confirm,
+   mixed intents, assert nonexistent policies, handoff boundary testing.
+3. **Sandbox scenario end-to-end** — 20–30 full conversations each through all 7
+   scenarios; real tone/hallucination/gate-leak testing.
+4. **Mutation testing on money code** — break each safety invariant in policy.py,
+   extend_flow.py, cancel_flow.py; confirm a test fails for each.
+5. **Concurrency/load sanity** — SQLite session store and JSONL logs under concurrent use.
+6. **Finalization checklist** — README accuracy, env.example completeness, DECISIONS.md
+   updates, flag defaults verified.
+
+### A. Upsell evaluation (deferred for now)
+`_upgrade_offer()` currently fires only in extend when charging a late fee; it's not
+wired into Cancel. Scope to evaluate later if time allows: wire into Cancel where fee
+avoidance is the stated motive; ensure handoff carries both upgrade and pending change;
+watch for upsell-as-obstacle failure mode. All behind `IN_FLOW_UPGRADE_OFFER`, default
+off, shadow-logged.
+
+### B. Known open review items (to be cleared or deferred in this pass)
+Items #1, #4, #7–#11 remain unresolved (see "Open" section above). Track outcome in
+final session report: fixed, deferred, or accepted as-is.
