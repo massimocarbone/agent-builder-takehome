@@ -162,7 +162,25 @@ are holding under pressure.
 
 ---
 
+---
+
 ## Cleared
+
+### 17. No authoritative source for "today" — FIXED
+Instructions are now a callable regenerated every turn, injecting real UTC time (a static
+string would go stale once the process outlived its start day). `build_quote()` gained a
+real-time floor rejecting targets already past relative to reality — the reservation's own
+stored dates are months stale and are not a substitute for knowing the actual date.
+Verified live: "extend to the 20th" on a June reservation now returns "June 20, 2026 has
+already passed... the new date needs to be in the future from today (August 6, 2026)"
+instead of quoting a backdated charge. Tests pin `now=EXTEND_TEST_NOW` so the suite
+doesn't become its own time bomb; new guard mutation-verified.
+
+### 18. Compound confirmation question produced ambiguous consent — FIXED
+Added an explicit rule: never treat a reply to a compound or multi-part question as
+consent to cancel — re-ask the cancel question alone, with the specific figures. Verified
+on the exact original input: "yeah do the original" now collects the email rather than
+cancelling (`consumed=False`), where it previously cancelled a real reservation.
 
 ### 5. Bot identity not disclosed until challenged — FIXED
 The CLI greeting now opens with "I'm Avis's automated assistant", and the instructions
@@ -225,3 +243,44 @@ the fabricated "more than 24 hours past your original due time" rule.
 ### 3. Over-escalation on answerable questions — FIXED
 The agent's remit is now "look up a reservation and answer questions about it" rather than
 extend-only. Read-only questions about a loaded reservation are answered, not escalated.
+
+---
+
+## Planned for the final session (2026-08-06)
+
+Last dedicated hour: **stress testing and trying to break the system**, plus evaluating
+upsell logic. Recording scope here so the session starts with a plan rather than a warm-up.
+
+### A. Upsell evaluation — the gap to close first
+`_upgrade_offer()` currently fires in **one** place: `extend_flow.build_quote`, and only
+when a standard member is being charged a real late fee. It is **not wired into Cancel at
+all** (verified). So the scenario named for evaluation — *"a customer cancelling to avoid
+late fees"* — currently gets no offer, which is exactly the case where a membership
+upgrade is most relevant: Preferred members are exempt from late fees (`kb_pref_02`), so
+someone cancelling *because of* a late fee may be better served upgrading and keeping the
+booking.
+
+Scope to evaluate (all behind `IN_FLOW_UPGRADE_OFFER`, still default off, shadow-logged):
+- Wire the offer into the Cancel path where the customer's stated motive is fee avoidance.
+- Confirm the handoff carries **both** the upgrade intent and the pending change, so one
+  representative finishes both in a single interaction (the original design intent — the
+  bot never calls `/customers/{id}/upgrade` itself).
+- Watch for the failure mode that matters: an upsell that reads as an **obstacle** to
+  cancelling. Offer once, accept "no" immediately, never gate the cancellation on it.
+  This is the same restraint rule as `CANCEL_RETENTION_PROMPT`, and the trust cost of
+  getting it wrong is higher than the revenue upside of getting it right.
+
+### B. Stress-test targets (highest value first)
+1. **Consent boundaries** — the class our code gates provably cannot close (#18). Compound
+   questions, mid-sentence reversals, "wait no", sarcasm, consent given then withdrawn.
+2. **Date reasoning** — now that time is grounded (#17), attack it: relative dates
+   ("next Tuesday"), ambiguous ones ("the 20th"), DST/timezone edges, far-future targets.
+3. **Cross-reservation state** — switching reservations mid-flow, mixing IDs, retrying
+   after a switch. The isolation guard is new (audit #1) and lightly exercised live.
+4. **Handoff terminality** — requests after a hard handoff, arguing with it, new
+   reservation IDs post-handoff.
+5. **Hallucination pressure** — demand reasons for fees, invent policies and ask for
+   confirmation, ask about uncovered topics (insurance, pets) where retrieval returns
+   plausible-but-wrong articles (#10).
+6. **Adversarial identity** — probing reservation IDs, claiming employee authority,
+   guessing emails to the lockout boundary.

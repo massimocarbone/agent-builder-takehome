@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import config
@@ -72,11 +72,16 @@ def _charges(quote_response: dict) -> dict:
     return quote_response.get("quote", {}).get("charges", {})
 
 
-def build_quote(session: ServicingSession, new_return_datetime: str) -> dict:
+def build_quote(session: ServicingSession, new_return_datetime: str,
+                now: datetime | None = None) -> dict:
     """Price an extension and stage it as the pending quote awaiting confirmation.
 
     Returns a structured summary for the agent to present. Also computes the optional
     offers, which are shadow-logged regardless of whether they are shown.
+
+    ``now`` defaults to real wall-clock time (matching policy.py's cancel estimator);
+    the parameter exists only so tests can pin it, never for a caller to override in
+    production — the tool wrapper in agent.py never passes one.
     """
     if not session.reservation:
         raise FlowError("Look up the reservation before quoting.")
@@ -88,6 +93,18 @@ def build_quote(session: ServicingSession, new_return_datetime: str) -> dict:
         raise FlowError(
             f"The requested return time ({target}) is not after the current return time "
             f"({current}). An extension must move the return later."
+        )
+
+    # A target after the reservation's own (possibly long-stale) return time can still be
+    # in the past relative to reality — exactly what let a customer nearly "extend" to a
+    # date that had already passed real time (REVIEW_QUEUE #17). The reservation's stored
+    # dates are not a substitute for knowing what day it actually is.
+    now = now or datetime.now(timezone.utc)
+    if _parse(target) < now:
+        raise FlowError(
+            f"The requested return time ({target}) has already passed — it is currently "
+            f"{now.strftime('%Y-%m-%d %H:%M UTC')}. Confirm with the customer what date "
+            "they actually mean; a return date must be in the future."
         )
 
     response = quote_change(session.reservation_id, "extend", target)

@@ -15,6 +15,7 @@ import random
 import sys
 import time
 import uuid
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
@@ -248,9 +249,15 @@ def escalate_to_human(ctx: RunContextWrapper[ServicingSession], reason: str,
 
 # --- Agent --------------------------------------------------------------------------
 
-INSTRUCTIONS = """\
+INSTRUCTIONS_TEMPLATE = """\
 You are an automated Avis rental servicing assistant. Say so if anyone asks whether
 they're talking to a person, and don't pretend otherwise.
+
+CURRENT DATE AND TIME (authoritative — right now, really, not a guess): {now_utc}.
+Use this as ground truth for anything date-relative — "next week", "in three days",
+whether a pickup or return is in the past or future. Never guess today's date and never
+trust a customer's claim about what day it is; if you need it, it's the line above.
+A reservation's own pickup/return times still come from tool results, not from here.
 
 You help customers with an existing rental. You can:
 - look up a reservation and answer questions about it
@@ -302,6 +309,16 @@ Cancellation is irreversible — never call confirm_cancellation on an ambiguous
 and never rush a hesitating customer. If they change their mind at any point, drop it
 immediately and confirm nothing was cancelled.
 
+CONSENT MUST BE UNAMBIGUOUS, ESPECIALLY FOR CANCEL. A staged estimate and a later turn
+are the mechanical gate, not the whole of consent — they prove a reply happened, not
+that it meant "yes, do this." Never treat a reply to a compound or multi-part question
+as consent to cancel. If your last message asked more than one thing (e.g. confirming a
+reservation ID AND asking whether to cancel), do not read a reply to the first half as
+answering the second — ask the cancel question again, alone: "just to confirm: cancel
+[reservation], penalty [$X], refund [$Y] — yes or no?" If anything about the reply is
+unclear, ask again rather than proceeding. Getting a real cancellation wrong costs far
+more than one extra question.
+
 RULES YOU DO NOT BEND
 - Never charge anything the customer has not seen and agreed to. If a tool says the price
   changed, show the new total and get agreement again.
@@ -338,10 +355,25 @@ WHAT YOU HAND OFF
 Be warm and brief. This is a phone-style conversation, not a form.
 """
 
+
+def build_instructions(ctx: RunContextWrapper[ServicingSession],
+                       agent: Agent[ServicingSession]) -> str:
+    """Instructions regenerated every turn so CURRENT DATE AND TIME is always real.
+
+    A static string would go stale the moment the process outlived the day it started.
+    Computed from real datetime.now(), the same source Cancel's policy.py already uses
+    for its own date math — this just shares that ground truth with the model too,
+    closing the gap where a fresh conversation with no context hallucinated a date over
+    two years wrong (REVIEW_QUEUE #17).
+    """
+    now = datetime.now(timezone.utc)
+    return INSTRUCTIONS_TEMPLATE.format(now_utc=now.strftime("%A, %B %d, %Y, %H:%M UTC"))
+
+
 servicing_agent = Agent[ServicingSession](
     name="Avis Servicing Agent",
     model=config.AGENT_MODEL,
-    instructions=INSTRUCTIONS,
+    instructions=build_instructions,
     tools=[lookup_reservation, quote_extension, confirm_extension,
            estimate_cancellation, confirm_cancellation, search_policy,
            escalate_to_human],

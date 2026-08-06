@@ -51,6 +51,13 @@ def reservation(base: str = "standard", **overrides) -> dict:
 
 DELETE = object()
 
+# All the "2026-06-xx" fixture dates predate this. Tests that call build_quote directly
+# must pass now=EXTEND_TEST_NOW so they stay deterministic regardless of when they
+# actually run — real wall-clock time will eventually pass those fixed dates too, which
+# is exactly the class of bug the real-time floor in build_quote exists to catch
+# (REVIEW_QUEUE #17). Pinning `now` keeps the test suite from becoming its own time bomb.
+EXTEND_TEST_NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
 
 def _shift_iso(iso: str, **delta) -> str:
     dt = datetime.fromisoformat(iso)
