@@ -465,6 +465,43 @@ nothing complained, right up until post-write reconciliation needed a total to r
 against and found the fixture had never had one. An abbreviated stub silently narrows
 what the suite is capable of noticing.
 
+### Local test evidence is a run artifact, not an append-only log
+
+The original JSONL files were useful while developing, but every invocation appended to
+the same `logs/` directory. That makes a failed test hard to reconstruct: the console,
+pytest outcome, agent decisions, and API retries may belong to different runs, and a
+developer can accidentally present stale evidence as current evidence.
+
+`scripts/run_tests.py` now creates one immutable directory per invocation under
+`artifacts/test-runs/<run-id>/`. It keeps the console transcript, pytest log, JUnit XML,
+structured agent/API events, environment metadata, and a machine-readable summary
+together. A generated timestamp-plus-random suffix prevents concurrent agents from
+overwriting each other; an explicit duplicate run id fails instead of appending. The
+wrapper sets `LOG_DIR` before importing application modules because the file handlers are
+constructed at import time. Direct production imports still fail fast without real Avis
+configuration; only the test subprocess receives inert `.invalid` credentials.
+
+**Correlation follows the lifecycle that needs debugging.** `run_id` identifies one
+test invocation, `test_id` one pytest case, `conversation_id` one customer session,
+`turn_id` one customer turn, and `operation_id` one logical API operation across all of
+its attempts. These values live in `contextvars`, which preserves isolation across async
+tasks without threading identifiers through every function signature. The API operation
+id is deliberately distinct from the write's idempotency key: the former is safe
+diagnostic identity for reads and writes; the latter is an API contract with replay
+semantics and should not become a general tracing primitive.
+
+**Redaction happens at the serialization boundary, recursively.** Sensitive keys and
+obvious secret-shaped strings are scrubbed before either logger writes. The runner then
+scans every textual artifact and fails the run if an obvious email, card number, or
+contextual CVV remains. That second pass caught false positives of its own (long decimal
+money representations and numeric stretches inside UUIDs), so those cases are regression
+tests too. The scan is defense in depth, not a claim that regex replaces access control,
+retention policy, or a production secret-detection service.
+
+This machinery is kept on `codex/test-run-artifacts` as a standalone, low-risk layer.
+The generative suites build on top of it but are not required to get isolated evidence
+from ordinary deterministic tests.
+
 ### `xfail` records a decision, never a result
 
 A later testing pass added ten adversarial tests under a module-level
@@ -1021,9 +1058,11 @@ is exactly why it's flagged and shadow-logged rather than assumed.
   scaffolding.
 - **Commit and push frequently** — small commits, so there's always a good point to fall
   back to if a feature fails, and the history tells the story of the build.
-- **No worktrees** — they pay off for simultaneous work on multiple branches; this build
-  is one person working sequentially. Revisit only if we parallelize (e.g. building
-  Modify while reviewing Cancel).
+- **Worktrees only when parallel work makes them pay for themselves.** The initial build
+  was sequential, so a second checkout would have added coordination without throughput.
+  That changed when librarian development and testing-infrastructure experiments ran at
+  the same time: the test work moved to an isolated worktree and two layered branches,
+  leaving the feature checkout and its untracked files untouched.
 - DECISIONS.md is updated whenever rationale changes, committed alongside the change.
 
 ---
