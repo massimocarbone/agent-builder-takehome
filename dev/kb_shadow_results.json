@@ -1,0 +1,2408 @@
+[
+  {
+    "query": "how do I extend my rental",
+    "lexical_ids": [
+      "kb_elig_01",
+      "kb_ext_01",
+      "kb_ext_04"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_ext_01 directly explains how to extend an active rental.",
+    "latency_ms": 4310
+  },
+  {
+    "query": "what happens if I return the car late",
+    "lexical_ids": [
+      "kb_fee_02",
+      "kb_ext_05",
+      "kb_pref_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_01",
+      "kb_fee_02",
+      "kb_ext_05",
+      "kb_pref_02",
+      "kb_pref_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_02",
+      "kb_ext_05",
+      "kb_pref_02"
+    ],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover late return fees, grace periods, and preferred member late-fee waivers.",
+    "latency_ms": 1853
+  },
+  {
+    "query": "can I change my pickup time",
+    "lexical_ids": [
+      "kb_mod_01",
+      "kb_fee_03",
+      "kb_can_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_mod_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_mod_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The article kb_mod_01 specifically covers changing pickup or return times on an active reservation.",
+    "latency_ms": 2985
+  },
+  {
+    "query": "how do I cancel my reservation",
+    "lexical_ids": [
+      "kb_can_01",
+      "kb_can_03",
+      "kb_upg_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_can_01 covers how to cancel a reservation.",
+    "latency_ms": 2064
+  },
+  {
+    "query": "how do I upgrade to Avis Preferred",
+    "lexical_ids": [
+      "kb_elig_02",
+      "kb_upg_01",
+      "kb_upg_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_upg_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_upg_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The article kb_upg_01 explains how to upgrade to Avis Preferred membership.",
+    "latency_ms": 1353
+  },
+  {
+    "query": "who is allowed to extend or modify a rental",
+    "lexical_ids": [
+      "kb_elig_01",
+      "kb_ext_01",
+      "kb_ext_04"
+    ],
+    "librarian_raw_ids": [
+      "kb_elig_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_elig_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The article kb_elig_01 specifically covers who can extend or modify a rental.",
+    "latency_ms": 1154
+  },
+  {
+    "query": "what are the Avis Preferred membership benefits",
+    "lexical_ids": [
+      "kb_upg_03",
+      "kb_upg_01",
+      "kb_pref_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_upg_03",
+      "kb_pref_01",
+      "kb_pref_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_upg_03",
+      "kb_pref_01",
+      "kb_pref_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover Avis Preferred membership benefits and program overview.",
+    "latency_ms": 1350
+  },
+  {
+    "query": "can I talk to a real person",
+    "lexical_ids": [
+      "kb_sup_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_sup_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_sup_01"
+    ],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article covers when customers are connected to a representative.",
+    "latency_ms": 1631
+  },
+  {
+    "query": "are there fees for returning outside business hours",
+    "lexical_ids": [
+      "kb_sup_02",
+      "kb_fee_02",
+      "kb_ext_05"
+    ],
+    "librarian_raw_ids": [
+      "kb_sup_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_sup_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_sup_02 specifically addresses returns outside business hours and related fees.",
+    "latency_ms": 1142
+  },
+  {
+    "query": "what is a one-way fee",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_pref_02",
+      "kb_mod_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_fee_03 explains the one-way and location change fees.",
+    "latency_ms": 1038
+  },
+  {
+    "query": "what is the grace period for late returns",
+    "lexical_ids": [
+      "kb_ext_05",
+      "kb_fee_02",
+      "kb_pref_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_01"
+    ],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_fee_01 specifically addresses late returns and grace periods.",
+    "latency_ms": 1431
+  },
+  {
+    "query": "what is the grace period",
+    "lexical_ids": [
+      "kb_ext_05",
+      "kb_ext_01",
+      "kb_fee_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_01",
+      "kb_fee_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles on late returns and grace periods directly address the question about the grace period.",
+    "latency_ms": 1120
+  },
+  {
+    "query": "do you cover insurance or a damage waiver",
+    "lexical_ids": [
+      "kb_pref_02",
+      "kb_pref_04"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Insurance and damage waivers are outside the covered topics for existing rentals.",
+    "latency_ms": 1134
+  },
+  {
+    "query": "is there a pet policy",
+    "lexical_ids": [
+      "kb_upg_03",
+      "kb_fee_03",
+      "kb_can_04"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Pet policies are outside the covered topics for existing rentals.",
+    "latency_ms": 892
+  },
+  {
+    "query": "what's your policy on pets",
+    "lexical_ids": [
+      "kb_can_01",
+      "kb_elig_03",
+      "kb_fee_02"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "No articles cover policies on pets in vehicles.",
+    "latency_ms": 1056
+  },
+  {
+    "query": "what is your policy",
+    "lexical_ids": [],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "The question is too broad and does not specify a topic covered by the existing articles.",
+    "latency_ms": 1186
+  },
+  {
+    "query": "how do i extned my rentl",
+    "lexical_ids": [],
+    "librarian_raw_ids": [
+      "kb_ext_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about extending a rental, directly covered by the article on extending an active Avis rental.",
+    "latency_ms": 2103
+  },
+  {
+    "query": "cancelation policy",
+    "lexical_ids": [],
+    "librarian_raw_ids": [
+      "kb_can_01",
+      "kb_can_02",
+      "kb_can_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_01",
+      "kb_can_02",
+      "kb_can_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover cancellation policy, refund timing, and no-show policy.",
+    "latency_ms": 1135
+  },
+  {
+    "query": "wat happens if i retrun late",
+    "lexical_ids": [
+      "kb_ext_05",
+      "kb_pref_02",
+      "kb_fee_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_01",
+      "kb_fee_02",
+      "kb_ext_05"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_02",
+      "kb_ext_05"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover late returns, grace periods, fees, and benefits of extending rental in advance.",
+    "latency_ms": 1381
+  },
+  {
+    "query": "chaning my pickup time",
+    "lexical_ids": [
+      "kb_mod_01",
+      "kb_can_01",
+      "kb_can_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_mod_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_mod_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about changing pickup time, which is covered by kb_mod_01.",
+    "latency_ms": 1400
+  },
+  {
+    "query": "prefered member benifits",
+    "lexical_ids": [
+      "kb_pref_02",
+      "kb_pref_04",
+      "kb_ext_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_upg_03",
+      "kb_pref_01",
+      "kb_pref_04",
+      "kb_pref_02",
+      "kb_pref_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_upg_03",
+      "kb_pref_01",
+      "kb_pref_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about Avis Preferred member benefits, which are covered by multiple articles on the preferred program and membership benefits.",
+    "latency_ms": 2052
+  },
+  {
+    "query": "how much is teh late fee",
+    "lexical_ids": [
+      "kb_pref_02",
+      "kb_fee_02",
+      "kb_ext_05"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_fee_02 specifies the amount of the late return fee.",
+    "latency_ms": 826
+  },
+  {
+    "query": "extend?",
+    "lexical_ids": [
+      "kb_elig_01",
+      "kb_ext_01",
+      "kb_ext_04"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about extending a rental, directly covered by kb_ext_01.",
+    "latency_ms": 969
+  },
+  {
+    "query": "late fee",
+    "lexical_ids": [
+      "kb_pref_02",
+      "kb_fee_02",
+      "kb_ext_05"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_01",
+      "kb_fee_02",
+      "kb_pref_02",
+      "kb_pref_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_02",
+      "kb_pref_02",
+      "kb_pref_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover late return fees and related preferred member benefits.",
+    "latency_ms": 1116
+  },
+  {
+    "query": "cancel",
+    "lexical_ids": [
+      "kb_can_01",
+      "kb_can_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The user query 'cancel' is directly addressed by the article on cancelling a reservation.",
+    "latency_ms": 980
+  },
+  {
+    "query": "upgrade",
+    "lexical_ids": [
+      "kb_elig_02",
+      "kb_upg_01",
+      "kb_upg_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_upg_02",
+      "kb_upg_01",
+      "kb_upg_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_upg_02",
+      "kb_upg_01",
+      "kb_upg_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "User query about 'upgrade' matches articles on vehicle upgrades and Avis Preferred membership benefits.",
+    "latency_ms": 1106
+  },
+  {
+    "query": "refund",
+    "lexical_ids": [
+      "kb_can_02",
+      "kb_can_01",
+      "kb_can_04"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question about refund is covered by the article on refund timing after cancellation.",
+    "latency_ms": 940
+  },
+  {
+    "query": "grace period",
+    "lexical_ids": [
+      "kb_ext_05",
+      "kb_ext_01",
+      "kb_fee_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_01",
+      "kb_fee_02",
+      "kb_pref_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_02",
+      "kb_pref_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover late returns, grace periods, fees, and preferred member late-fee waivers.",
+    "latency_ms": 1404
+  },
+  {
+    "query": "one way fee",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_pref_02",
+      "kb_mod_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about one-way fees, which is covered by article kb_fee_03.",
+    "latency_ms": 1350
+  },
+  {
+    "query": "child seat",
+    "lexical_ids": [],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "No articles cover child seats as it is outside the existing rental servicing scope.",
+    "latency_ms": 913
+  },
+  {
+    "query": "pet fee",
+    "lexical_ids": [
+      "kb_pref_02",
+      "kb_fee_02"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "No articles cover pet fees or policies related to animals in vehicles.",
+    "latency_ms": 1045
+  },
+  {
+    "query": "can I extend and also change the pickup location",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_mod_01",
+      "kb_elig_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_01",
+      "kb_mod_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_01",
+      "kb_mod_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover extending rentals and changing return locations, which is closest to pickup location changes.",
+    "latency_ms": 1093
+  },
+  {
+    "query": "I want to cancel but also know if I get a refund",
+    "lexical_ids": [
+      "kb_can_01",
+      "kb_can_02",
+      "kb_ext_05"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_01",
+      "kb_can_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_01",
+      "kb_can_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover cancellation process and refund timing after cancellation.",
+    "latency_ms": 1109
+  },
+  {
+    "query": "how do I upgrade and will that waive my late fee",
+    "lexical_ids": [
+      "kb_pref_02",
+      "kb_fee_02",
+      "kb_upg_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_upg_02",
+      "kb_pref_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_upg_02",
+      "kb_pref_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover vehicle upgrades and late fee waivers for Preferred members.",
+    "latency_ms": 1058
+  },
+  {
+    "query": "can I change my return time and location at once",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_mod_02",
+      "kb_mod_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_mod_01",
+      "kb_mod_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_mod_01",
+      "kb_mod_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover changing return time and changing return location, both relevant to the question.",
+    "latency_ms": 1149
+  },
+  {
+    "query": "if I extend will my rate change and is there a fee",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_elig_01",
+      "kb_fee_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_02",
+      "kb_ext_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_02",
+      "kb_ext_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles explain extension charges and the ability to extend rentals if vehicle is available.",
+    "latency_ms": 1503
+  },
+  {
+    "query": "can I keep the car a couple more days",
+    "lexical_ids": [
+      "kb_ext_03",
+      "kb_ext_04",
+      "kb_can_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_01",
+      "kb_ext_04",
+      "kb_ext_05"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_01",
+      "kb_ext_04",
+      "kb_ext_05"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about extending a rental, which is covered by extension policy articles.",
+    "latency_ms": 1477
+  },
+  {
+    "query": "I'm not going to make it back in time, what happens",
+    "lexical_ids": [
+      "kb_can_03",
+      "kb_upg_03",
+      "kb_mod_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_01",
+      "kb_fee_02",
+      "kb_ext_05"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_02",
+      "kb_ext_05"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover late returns, fees, and the option to extend the rental.",
+    "latency_ms": 1416
+  },
+  {
+    "query": "I don't need the vehicle anymore, what do I do",
+    "lexical_ids": [
+      "kb_mod_04",
+      "kb_ext_05",
+      "kb_ext_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about ending a rental early, which is covered by kb_can_04.",
+    "latency_ms": 1194
+  },
+  {
+    "query": "can somebody else pick up the car for me",
+    "lexical_ids": [
+      "kb_elig_01",
+      "kb_ext_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_elig_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_elig_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_elig_01 covers who can extend or modify a rental, including who may make changes.",
+    "latency_ms": 1032
+  },
+  {
+    "query": "will it cost extra to drop off somewhere else",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_upg_03",
+      "kb_fee_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_03",
+      "kb_mod_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_03",
+      "kb_mod_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover one-way fees and changing return location fees.",
+    "latency_ms": 1065
+  },
+  {
+    "query": "does my membership tier get me anything special",
+    "lexical_ids": [
+      "kb_upg_01",
+      "kb_pref_01",
+      "kb_elig_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_upg_03",
+      "kb_pref_01",
+      "kb_pref_02",
+      "kb_pref_03",
+      "kb_pref_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_upg_03",
+      "kb_pref_01",
+      "kb_pref_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover benefits and features of Avis Preferred membership tiers.",
+    "latency_ms": 1253
+  },
+  {
+    "query": "what if nobody shows up to get the car",
+    "lexical_ids": [
+      "kb_elig_01",
+      "kb_ext_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The no-show policy article covers what happens if a reservation is not used or cancelled by the scheduled pickup time.",
+    "latency_ms": 1332
+  },
+  {
+    "query": "how do refunds work when plans change",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_can_01",
+      "kb_can_04"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question about refunds when plans change is answered by the article on refund timing after cancellation.",
+    "latency_ms": 1166
+  },
+  {
+    "query": "is my card required again if I change dates",
+    "lexical_ids": [
+      "kb_elig_03",
+      "kb_fee_03",
+      "kb_ext_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_elig_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_elig_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Payment and card requirements apply to changes that result in charges, such as date changes.",
+    "latency_ms": 1498
+  },
+  {
+    "query": "can I get a different kind of car after booking",
+    "lexical_ids": [
+      "kb_can_02",
+      "kb_pref_04",
+      "kb_upg_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_mod_03",
+      "kb_mod_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_mod_03",
+      "kb_mod_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover vehicle class changes and availability after booking.",
+    "latency_ms": 1191
+  },
+  {
+    "query": "what is your pet policy",
+    "lexical_ids": [],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Pet policy is outside the covered topics of servicing an existing rental.",
+    "latency_ms": 1024
+  },
+  {
+    "query": "do you offer roadside assistance",
+    "lexical_ids": [
+      "kb_ext_01",
+      "kb_ext_04"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Roadside assistance is outside the covered topics in the knowledge base.",
+    "latency_ms": 2171
+  },
+  {
+    "query": "can I add a child seat",
+    "lexical_ids": [
+      "kb_ext_03"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Child seats are not covered in the existing rental servicing knowledge base.",
+    "latency_ms": 1224
+  },
+  {
+    "query": "is smoking allowed in the car",
+    "lexical_ids": [],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Smoking policy is not covered in the existing rental servicing articles.",
+    "latency_ms": 1262
+  },
+  {
+    "query": "do you have fuel discounts",
+    "lexical_ids": [
+      "kb_upg_03",
+      "kb_elig_02",
+      "kb_elig_01"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Fuel discounts are not covered in the Avis rental servicing knowledge base.",
+    "latency_ms": 1998
+  },
+  {
+    "query": "will you cover my tolls",
+    "lexical_ids": [],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Tolls are not covered in the Avis rental servicing knowledge base.",
+    "latency_ms": 1131
+  },
+  {
+    "query": "what happens if I get a speeding ticket",
+    "lexical_ids": [],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "No articles cover speeding tickets or traffic violations.",
+    "latency_ms": 970
+  },
+  {
+    "query": "can I book a new reservation through you",
+    "lexical_ids": [
+      "kb_elig_03",
+      "kb_ext_01",
+      "kb_mod_01"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "The question is about new bookings, which is outside the covered topics of servicing existing rentals.",
+    "latency_ms": 979
+  },
+  {
+    "query": "how much does a new rental cost",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_ext_01",
+      "kb_ext_05"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Pricing for new rentals is outside the scope of servicing existing rentals.",
+    "latency_ms": 1397
+  },
+  {
+    "query": "do you sell travel insurance",
+    "lexical_ids": [],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Insurance products are outside the covered topics for existing rentals.",
+    "latency_ms": 979
+  },
+  {
+    "query": "what is your policy on driving into Mexico",
+    "lexical_ids": [
+      "kb_fee_02",
+      "kb_mod_04"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Driving into Mexico is outside the covered topics of servicing an existing rental.",
+    "latency_ms": 890
+  },
+  {
+    "query": "can I rent if I'm under 21",
+    "lexical_ids": [
+      "kb_pref_01",
+      "kb_pref_03"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Age and new bookings are outside the covered topics for existing rentals.",
+    "latency_ms": 980
+  },
+  {
+    "query": "do you offer GPS rental",
+    "lexical_ids": [
+      "kb_ext_01",
+      "kb_ext_04",
+      "kb_ext_05"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "No articles cover GPS rental as it is outside servicing an existing rental.",
+    "latency_ms": 830
+  },
+  {
+    "query": "is there a shuttle service",
+    "lexical_ids": [
+      "kb_upg_01",
+      "kb_upg_03",
+      "kb_fee_03"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Shuttle service is not covered in the existing rental servicing topics.",
+    "latency_ms": 762
+  },
+  {
+    "query": "can I add an additional driver",
+    "lexical_ids": [
+      "kb_ext_03",
+      "kb_ext_05",
+      "kb_ext_01"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "No articles cover adding additional drivers, which is outside the existing rental servicing scope.",
+    "latency_ms": 1295
+  },
+  {
+    "query": "how are extension charges calculated",
+    "lexical_ids": [
+      "kb_ext_02",
+      "kb_mod_01",
+      "kb_ext_05"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is directly answered by the article on how extension charges are calculated.",
+    "latency_ms": 1151
+  },
+  {
+    "query": "can I extend for just one extra day",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_ext_03",
+      "kb_fee_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_03",
+      "kb_ext_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_03",
+      "kb_ext_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover short extensions and general extension policy including one-day extensions.",
+    "latency_ms": 1081
+  },
+  {
+    "query": "will extending change my daily rate",
+    "lexical_ids": [
+      "kb_ext_05",
+      "kb_ext_01",
+      "kb_fee_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_ext_02 explains how extension charges are calculated including daily rates.",
+    "latency_ms": 1414
+  },
+  {
+    "query": "is the car guaranteed to still be available if I extend",
+    "lexical_ids": [
+      "kb_ext_01",
+      "kb_ext_04",
+      "kb_elig_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_ext_04 explains that extensions depend on vehicle availability for upcoming reservations.",
+    "latency_ms": 983
+  },
+  {
+    "query": "what's the difference between extending and returning late",
+    "lexical_ids": [
+      "kb_ext_05",
+      "kb_ext_01",
+      "kb_pref_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_05",
+      "kb_fee_01",
+      "kb_fee_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_05",
+      "kb_fee_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles explain the difference between extending a rental and returning late, including fees and policies.",
+    "latency_ms": 1571
+  },
+  {
+    "query": "if I'm late does that count as an extension",
+    "lexical_ids": [
+      "kb_upg_01",
+      "kb_ext_05",
+      "kb_pref_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_05",
+      "kb_fee_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_05"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles explain the difference between late returns and extensions and related fees.",
+    "latency_ms": 998
+  },
+  {
+    "query": "I need the car for one more day only",
+    "lexical_ids": [
+      "kb_ext_03",
+      "kb_fee_03",
+      "kb_can_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_03",
+      "kb_ext_01",
+      "kb_ext_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_03",
+      "kb_ext_01",
+      "kb_ext_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles about short extensions and extending rentals cover adding one day.",
+    "latency_ms": 1187
+  },
+  {
+    "query": "extending my rental by a week, is that possible",
+    "lexical_ids": [
+      "kb_ext_01",
+      "kb_ext_05",
+      "kb_pref_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_01",
+      "kb_ext_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_01",
+      "kb_ext_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover extending rentals and vehicle availability for extensions.",
+    "latency_ms": 1039
+  },
+  {
+    "query": "how much is the late return fee",
+    "lexical_ids": [
+      "kb_fee_02",
+      "kb_pref_02",
+      "kb_ext_05"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_fee_02 explicitly states the amount of the late return fee.",
+    "latency_ms": 1082
+  },
+  {
+    "query": "what taxes and surcharges apply",
+    "lexical_ids": [
+      "kb_fee_04",
+      "kb_fee_03",
+      "kb_ext_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about taxes and surcharges on rentals, directly covered by kb_fee_04.",
+    "latency_ms": 1283
+  },
+  {
+    "query": "is there a fee for changing locations",
+    "lexical_ids": [
+      "kb_mod_01",
+      "kb_mod_02",
+      "kb_mod_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_03",
+      "kb_mod_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_03",
+      "kb_mod_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover fees and policies for changing return locations including one-way fees.",
+    "latency_ms": 1413
+  },
+  {
+    "query": "what if I return the car with less fuel than I got it",
+    "lexical_ids": [
+      "kb_mod_02",
+      "kb_ext_05",
+      "kb_fee_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_05"
+    ],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_fee_05 covers fuel and refueling charges related to returning the vehicle with less fuel.",
+    "latency_ms": 1202
+  },
+  {
+    "query": "returning after hours, what happens",
+    "lexical_ids": [
+      "kb_ext_05",
+      "kb_sup_02",
+      "kb_pref_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_sup_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_sup_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_sup_02 specifically addresses returns outside business hours.",
+    "latency_ms": 1185
+  },
+  {
+    "query": "why was I charged extra for fuel",
+    "lexical_ids": [
+      "kb_fee_02",
+      "kb_pref_04",
+      "kb_upg_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_05"
+    ],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about fuel charges, which is covered by the fuel and refueling charges article.",
+    "latency_ms": 1092
+  },
+  {
+    "query": "can I change where I drop off the car",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_mod_01",
+      "kb_elig_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_mod_02",
+      "kb_fee_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_mod_02",
+      "kb_fee_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover changing return location and associated one-way fees.",
+    "latency_ms": 1277
+  },
+  {
+    "query": "can I change my pickup time to earlier",
+    "lexical_ids": [
+      "kb_mod_01",
+      "kb_fee_03",
+      "kb_can_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_mod_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_mod_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article covers changing pickup or return time on an active reservation.",
+    "latency_ms": 1362
+  },
+  {
+    "query": "I booked a sedan can I switch to an SUV",
+    "lexical_ids": [
+      "kb_upg_02",
+      "kb_mod_02",
+      "kb_can_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_mod_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_mod_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about changing vehicle class during an existing rental, which is covered by kb_mod_03.",
+    "latency_ms": 1362
+  },
+  {
+    "query": "the car I wanted isn't available, what happens",
+    "lexical_ids": [
+      "kb_mod_04",
+      "kb_ext_01",
+      "kb_mod_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_mod_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_mod_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_mod_04 explains what happens when a requested vehicle isn't available.",
+    "latency_ms": 1058
+  },
+  {
+    "query": "how far in advance can I change my reservation",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_upg_02",
+      "kb_can_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_mod_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_mod_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_mod_01 covers changing pickup or return times on an active reservation, which relates to modifying reservation timing.",
+    "latency_ms": 1129
+  },
+  {
+    "query": "will I get charged if I cancel",
+    "lexical_ids": [
+      "kb_can_01",
+      "kb_can_03",
+      "kb_ext_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_01",
+      "kb_can_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_01",
+      "kb_can_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover cancellation policy and refund timing after cancellation.",
+    "latency_ms": 1186
+  },
+  {
+    "query": "what's the refund timeline after cancelling",
+    "lexical_ids": [
+      "kb_can_01",
+      "kb_can_02",
+      "kb_fee_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_can_02 specifically addresses refund timing after a cancellation.",
+    "latency_ms": 1004
+  },
+  {
+    "query": "I never picked up the car, am I charged",
+    "lexical_ids": [
+      "kb_ext_02",
+      "kb_elig_01",
+      "kb_ext_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "No-show policy article covers charges when a reservation is not used or cancelled.",
+    "latency_ms": 962
+  },
+  {
+    "query": "can I return the car early without cancelling",
+    "lexical_ids": [
+      "kb_can_01",
+      "kb_can_04",
+      "kb_can_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_can_04 explains policies about ending a rental early without cancelling.",
+    "latency_ms": 2300
+  },
+  {
+    "query": "if I bring the car back early do I get money back",
+    "lexical_ids": [
+      "kb_can_04",
+      "kb_can_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_can_04 explains charges and refunds for ending a rental early.",
+    "latency_ms": 1026
+  },
+  {
+    "query": "does cancelling within 24 hours cost more",
+    "lexical_ids": [
+      "kb_can_01",
+      "kb_sup_02",
+      "kb_can_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_01",
+      "kb_can_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_01",
+      "kb_can_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover cancellation policies and refund timing, relevant to cancelling within 24 hours.",
+    "latency_ms": 1134
+  },
+  {
+    "query": "I want to end my rental early, is that a cancellation",
+    "lexical_ids": [
+      "kb_can_04",
+      "kb_can_02",
+      "kb_can_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Ending a rental early is covered by the article on ending a rental early, distinct from cancellation.",
+    "latency_ms": 905
+  },
+  {
+    "query": "how do I become an Avis Preferred member",
+    "lexical_ids": [
+      "kb_pref_02",
+      "kb_elig_02",
+      "kb_upg_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_upg_01",
+      "kb_elig_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_upg_01",
+      "kb_elig_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover Avis Preferred membership overview and eligibility requirements.",
+    "latency_ms": 1616
+  },
+  {
+    "query": "what do I get with an upgrade",
+    "lexical_ids": [
+      "kb_elig_02",
+      "kb_upg_01",
+      "kb_upg_02"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "timeout",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "APITimeoutError: Request timed out.",
+    "latency_ms": 3058
+  },
+  {
+    "query": "can I upgrade my vehicle class after booking",
+    "lexical_ids": [
+      "kb_mod_03",
+      "kb_elig_02",
+      "kb_upg_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_mod_03",
+      "kb_upg_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_mod_03",
+      "kb_upg_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover vehicle class changes and upgrades on a reservation.",
+    "latency_ms": 2079
+  },
+  {
+    "query": "does upgrading cost extra",
+    "lexical_ids": [
+      "kb_upg_01",
+      "kb_fee_03",
+      "kb_upg_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_upg_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_upg_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_upg_02 explains vehicle upgrades on a reservation, which implies potential extra cost.",
+    "latency_ms": 1138
+  },
+  {
+    "query": "what are the eligibility requirements for Preferred",
+    "lexical_ids": [
+      "kb_elig_02",
+      "kb_elig_03",
+      "kb_upg_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_elig_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_elig_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_elig_02 specifically covers Avis Preferred eligibility requirements.",
+    "latency_ms": 1189
+  },
+  {
+    "query": "does the person modifying the rental need to be the driver",
+    "lexical_ids": [
+      "kb_ext_05",
+      "kb_sup_01",
+      "kb_ext_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_elig_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_elig_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_elig_01 covers who can extend or modify a rental, addressing the question about the person modifying the rental.",
+    "latency_ms": 1349
+  },
+  {
+    "query": "what payment info do you need to make a change",
+    "lexical_ids": [
+      "kb_elig_03",
+      "kb_elig_01",
+      "kb_fee_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_elig_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_elig_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_elig_03 covers payment and card requirements for changes that result in a charge.",
+    "latency_ms": 1994
+  },
+  {
+    "query": "can I use a debit card",
+    "lexical_ids": [
+      "kb_elig_03",
+      "kb_pref_01",
+      "kb_can_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_elig_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_elig_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Payment and card requirements article covers acceptable payment methods including debit cards.",
+    "latency_ms": 1134
+  },
+  {
+    "query": "do you need my CVV to extend",
+    "lexical_ids": [
+      "kb_elig_03",
+      "kb_elig_01",
+      "kb_ext_05"
+    ],
+    "librarian_raw_ids": [
+      "kb_elig_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_elig_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Payment and card requirements article covers the need for valid payment methods for extensions.",
+    "latency_ms": 1316
+  },
+  {
+    "query": "what's required to change my reservation",
+    "lexical_ids": [
+      "kb_elig_03",
+      "kb_fee_03",
+      "kb_can_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_elig_03",
+      "kb_mod_01",
+      "kb_mod_02",
+      "kb_mod_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_elig_03",
+      "kb_mod_01",
+      "kb_mod_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover requirements and policies for changing pickup/return times, locations, vehicle class, and payment requirements.",
+    "latency_ms": 1971
+  },
+  {
+    "query": "how do I keep my Preferred status",
+    "lexical_ids": [
+      "kb_pref_03",
+      "kb_elig_02",
+      "kb_pref_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_pref_03"
+    ],
+    "librarian_finalized_ids": [
+      "kb_pref_03"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about maintaining Avis Preferred status, directly covered by kb_pref_03.",
+    "latency_ms": 1283
+  },
+  {
+    "query": "does Preferred waive late fees",
+    "lexical_ids": [
+      "kb_pref_02",
+      "kb_fee_02",
+      "kb_upg_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_pref_02",
+      "kb_pref_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_pref_02",
+      "kb_pref_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles specifically address late-fee waivers for Avis Preferred members.",
+    "latency_ms": 2411
+  },
+  {
+    "query": "what if I'm a few minutes late as a Preferred member",
+    "lexical_ids": [
+      "kb_pref_02",
+      "kb_ext_01",
+      "kb_pref_04"
+    ],
+    "librarian_raw_ids": [
+      "kb_pref_02",
+      "kb_fee_01",
+      "kb_pref_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_pref_02",
+      "kb_pref_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Preferred members are not charged late fees and there is a grace period for late returns.",
+    "latency_ms": 1412
+  },
+  {
+    "query": "how much flexibility do Preferred members get on timing",
+    "lexical_ids": [
+      "kb_pref_04",
+      "kb_pref_01",
+      "kb_can_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_pref_04",
+      "kb_pref_03",
+      "kb_pref_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_pref_04",
+      "kb_pref_03",
+      "kb_pref_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover timing flexibility and benefits for Preferred members including late fee waivers.",
+    "latency_ms": 1418
+  },
+  {
+    "query": "I want to speak to a manager",
+    "lexical_ids": [
+      "kb_mod_04",
+      "kb_can_04"
+    ],
+    "librarian_raw_ids": [
+      "kb_sup_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_sup_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Customer wants to speak to a representative, covered by article on connecting to a representative.",
+    "latency_ms": 1141
+  },
+  {
+    "query": "this isn't working, connect me to someone",
+    "lexical_ids": [
+      "kb_mod_04",
+      "kb_sup_01",
+      "kb_fee_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_sup_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_sup_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "User requests connection to a representative, covered by article kb_sup_01.",
+    "latency_ms": 1039
+  },
+  {
+    "query": "my situation is complicated, can a human help",
+    "lexical_ids": [],
+    "librarian_raw_ids": [
+      "kb_sup_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_sup_01"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Customer requests human assistance for a complicated situation.",
+    "latency_ms": 1016
+  },
+  {
+    "query": "how do I book a new rental",
+    "lexical_ids": [
+      "kb_ext_01",
+      "kb_ext_05",
+      "kb_mod_01"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Booking new rentals is outside the scope of servicing existing rentals.",
+    "latency_ms": 899
+  },
+  {
+    "query": "what cars do you have available",
+    "lexical_ids": [
+      "kb_mod_04",
+      "kb_elig_02",
+      "kb_elig_01"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Question about available cars is about new bookings, which is outside the covered topics.",
+    "latency_ms": 956
+  },
+  {
+    "query": "what's your cheapest rate",
+    "lexical_ids": [
+      "kb_can_01",
+      "kb_elig_03",
+      "kb_fee_02"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Pricing and new bookings are outside the covered topics for existing rentals.",
+    "latency_ms": 838
+  },
+  {
+    "query": "do you have locations near the airport",
+    "lexical_ids": [
+      "kb_fee_04",
+      "kb_sup_02",
+      "kb_elig_02"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "The question is about location availability, which is outside the covered topics of servicing an existing rental.",
+    "latency_ms": 958
+  },
+  {
+    "query": "can I rent a car for a road trip to another country",
+    "lexical_ids": [
+      "kb_pref_03",
+      "kb_pref_01",
+      "kb_upg_02"
+    ],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "Question about renting for international travel is outside the covered topics.",
+    "latency_ms": 743
+  },
+  {
+    "query": "late fee policy for rentals extended past original return",
+    "lexical_ids": [
+      "kb_fee_02",
+      "kb_pref_02",
+      "kb_ext_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_01",
+      "kb_fee_02",
+      "kb_ext_05"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_02",
+      "kb_ext_05"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover late return fees and differences between late returns and extensions.",
+    "latency_ms": 1027
+  },
+  {
+    "query": "extension charges for late returns beyond original date",
+    "lexical_ids": [
+      "kb_fee_02",
+      "kb_pref_02",
+      "kb_ext_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_02",
+      "kb_ext_05",
+      "kb_fee_01",
+      "kb_fee_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_02",
+      "kb_ext_05",
+      "kb_fee_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover extension charges, late returns, and related fees.",
+    "latency_ms": 1154
+  },
+  {
+    "query": "policy for extending a rental that is already late",
+    "lexical_ids": [
+      "kb_ext_05",
+      "kb_ext_01",
+      "kb_pref_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_01",
+      "kb_ext_05",
+      "kb_fee_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_01",
+      "kb_ext_05"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover extending an active rental including when late and differences between extending and late returns.",
+    "latency_ms": 1310
+  },
+  {
+    "query": "what happens to my extension if I'm already past due",
+    "lexical_ids": [
+      "kb_ext_05",
+      "kb_ext_02",
+      "kb_pref_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_05",
+      "kb_fee_01",
+      "kb_fee_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_05",
+      "kb_fee_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover policies on late returns versus extensions and related fees.",
+    "latency_ms": 1183
+  },
+  {
+    "query": "fees",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_fee_02",
+      "kb_sup_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_01",
+      "kb_fee_02",
+      "kb_fee_03",
+      "kb_fee_04",
+      "kb_fee_05"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_02",
+      "kb_fee_03",
+      "kb_fee_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "The question is about fees, and multiple articles cover various fee types.",
+    "latency_ms": 1069
+  },
+  {
+    "query": "policy",
+    "lexical_ids": [],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "The question 'policy' is too vague and does not specify a covered topic related to servicing an existing rental.",
+    "latency_ms": 1343
+  },
+  {
+    "query": "help",
+    "lexical_ids": [],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "The question is too vague and does not specify a topic covered by the help center articles.",
+    "latency_ms": 785
+  },
+  {
+    "query": "rules",
+    "lexical_ids": [],
+    "librarian_raw_ids": [],
+    "librarian_finalized_ids": [],
+    "agree": true,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": true,
+    "reason": "User asked for rules, which is outside the covered topics of servicing an existing rental.",
+    "latency_ms": 894
+  },
+  {
+    "query": "membership",
+    "lexical_ids": [
+      "kb_elig_02",
+      "kb_upg_01",
+      "kb_upg_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_pref_01",
+      "kb_pref_03",
+      "kb_pref_02",
+      "kb_pref_04",
+      "kb_upg_01"
+    ],
+    "librarian_finalized_ids": [
+      "kb_pref_01",
+      "kb_pref_03",
+      "kb_pref_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "User query about membership is covered by multiple articles on Avis Preferred program and benefits.",
+    "latency_ms": 1007
+  },
+  {
+    "query": "hey so I picked up my car last week and I think I need a few more days, what do I need to do and will it cost a lot more",
+    "lexical_ids": [
+      "kb_ext_03",
+      "kb_ext_05",
+      "kb_can_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_01",
+      "kb_ext_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_01",
+      "kb_ext_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Question about extending an active rental and related charges is covered by extension articles.",
+    "latency_ms": 1511
+  },
+  {
+    "query": "I'm supposed to return today but flights got cancelled and I won't make it, is there a fee for that",
+    "lexical_ids": [
+      "kb_mod_04",
+      "kb_can_03",
+      "kb_upg_03"
+    ],
+    "librarian_raw_ids": [
+      "kb_fee_01",
+      "kb_fee_02",
+      "kb_ext_05"
+    ],
+    "librarian_finalized_ids": [
+      "kb_fee_02",
+      "kb_ext_05"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Late return fees and the option to extend rentals cover fees related to returning the vehicle late due to flight cancellations.",
+    "latency_ms": 1380
+  },
+  {
+    "query": "quick question, if I extend twice in one rental does that cause any issues",
+    "lexical_ids": [
+      "kb_fee_03",
+      "kb_elig_01",
+      "kb_ext_01"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_01",
+      "kb_ext_02",
+      "kb_ext_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_01",
+      "kb_ext_02",
+      "kb_ext_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover extending rentals including availability and charges, applicable to multiple extensions.",
+    "latency_ms": 1071
+  },
+  {
+    "query": "trying to figure out if it's cheaper to extend now or just pay the late fee when I bring it back",
+    "lexical_ids": [
+      "kb_fee_02",
+      "kb_ext_05",
+      "kb_pref_02"
+    ],
+    "librarian_raw_ids": [
+      "kb_ext_05",
+      "kb_fee_02"
+    ],
+    "librarian_finalized_ids": [
+      "kb_ext_05",
+      "kb_fee_02"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Articles cover cost comparison between extending rental and paying late fees.",
+    "latency_ms": 1345
+  },
+  {
+    "query": "we decided to end the trip early and don't want the car anymore, do we owe anything",
+    "lexical_ids": [
+      "kb_mod_04",
+      "kb_sup_01",
+      "kb_can_04"
+    ],
+    "librarian_raw_ids": [
+      "kb_can_04"
+    ],
+    "librarian_finalized_ids": [
+      "kb_can_04"
+    ],
+    "agree": false,
+    "librarian_status": "ok",
+    "hallucinated_ids": [],
+    "no_coverage": false,
+    "reason": "Article kb_can_04 explains charges related to ending a rental early.",
+    "latency_ms": 917
+  }
+]

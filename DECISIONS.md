@@ -1161,16 +1161,29 @@ shadow mode against realistic, adversarial query/session volumes:
    DECISIONS.md §4 flags table and §8B plan are both updated with final measurements
    and decisions, all flags default to graded values in src/.
 
+### B.1 High-volume property/state-machine results
+
+Ran `tests/test_properties.py` + `tests/test_state_machine.py` with `max_examples=500`
+(property tests) and `max_examples=500, stateful_step_count=100` (state machine) via a
+temporary env-var override, not a committed change — the checked-in defaults
+(`max_examples=30`; `35×25`) stay as authored, sized for a fast take-home CI run, not for
+this one-off stress pass. **Result: 10/10 passed, zero shrinkable failures**, in ~32s.
+No new invariant violations found across roughly 16x more property examples and 4x more
+state-machine steps than the committed suite exercises. This is a clean result, not a
+negative one — it means the deterministic money/session layer held up under substantially
+more randomized exploration than CI runs by default, which is the best evidence available
+short of finding an actual bug.
+
 ### C. Decision record
 
 After the testing pass, update this section with measurements and per-flag decisions:
 
 | Flag | Measured | Decision | Evidence |
 |---|---|---|---|
-| `KB_RETRIEVAL_MODE` | TBD | TBD | TBD |
-| `FLEXIBLE_DATE_ALTERNATIVES_MODE` | TBD | TBD | TBD |
-| `IN_FLOW_UPGRADE_OFFER` | TBD | TBD | TBD |
-| `CANCEL_RETENTION_PROMPT` | TBD | TBD | TBD |
+| `KB_RETRIEVAL_MODE` | 123 live queries (`dev/kb_shadow_eval.py`): 9.8% agreement (90.2% disagreement) at the finalized level, 0% hallucination, 0.8% failure (1 timeout), latency p50 1154ms / p95 2103ms / max 4310ms. No-coverage precision: librarian 20/22 (91%) correct on genuinely out-of-scope queries vs. lexical 0/22 (always returned 1–3 irrelevant articles). Hand-review of all 111 disagreements (bucketed: 43 subset, 25 overlap, 22 lib_empty, 17 disjoint, 3 lex_empty, 1 fail) shows the majority favor the librarian — 43/111 are just lexical's `TOP_N=3` padding around the same top pick, not real errors. | Move `lexical` → `shadow` now, not directly to `librarian`. Both stated-bar conditions (>90% disagreement, majority favor librarian) are technically met, but added latency, a corpus this small, and one found `propose()` selection gap (grace-period query: raw proposal picked the legacy article, correctly suppressed by `_finalize` but leaving an empty result instead of the correct official article) argue for confirming at real-traffic volume before it's the default producer. | `dev/kb_shadow_report.md` (full hand-review, bucket-by-bucket); raw data `dev/kb_shadow_results.json`; script `dev/kb_shadow_eval.py` |
+| `FLEXIBLE_DATE_ALTERNATIVES_MODE` | Ran `dev/flexdate_shadow_runner.py` against the real Avis API/agent, 21 scripted extension conversations across 3 real test reservations. `FLEXIBLE_DATE_ALTERNATIVES_MODE=shadow` confirmed correctly set in-process (`config.FLEXIBLE_DATE_ALTERNATIVES_MODE == "shadow"`). Only 4/21 conversations reached a successful primary quote — the rest hit the real-time floor guard (REVIEW_QUEUE #17 fix working as designed: the test reservations' stored return dates are now in the past relative to real wall-clock time, so simple relative phrasing like "extend to Thursday" computed against the *reservation's* stale date, not real "today"). Of those 4 successful quotes, **zero `date_alternatives_computed` shadow-log events were produced** in `logs/agent.jsonl`, despite the flag being confirmed on. | **Inconclusive — not a decision, a failed data-collection attempt.** The flag's own unit/property tests pass (`test_slow_alternatives_do_not_block_the_primary_quote` etc.), so this isn't evidence the code path is broken — it's evidence this specific live probe didn't exercise it, for a reason not root-caused in this pass (candidate log_event call unconditionally fires once `_date_alternatives` is entered in shadow mode; either that function wasn't reached for these 4 quotes for a reason not yet identified, or a code path since diverged from the tested one). Stays `off` by default per existing policy; needs a re-run with direct instrumentation (e.g. a temporary print or debugger breakpoint at `extend_flow.py:184`) before this flag's shadow data can inform a real decision either way. | `dev/flexdate_shadow_runner.py`, `dev/flexdate_shadow_transcripts.txt` |
+| `IN_FLOW_UPGRADE_OFFER` | Ran `dev/trigger_flag_runner.py` (offline sandbox) — 5 standard-member conversations aimed at the late-fee/upgrade path. Most (4/5) hit the same real-time floor guard as above before reaching a charged, late-fee-bearing extension (the sandbox's synthetic dates were similarly stale relative to the run's real wall-clock time). One conversation did complete a late extension and produced a live `upgrade_offer_computed` event: `membership_status=standard`, `late_fee_on_this_quote=$29.00`, `surfaced=False`, `handling=escalate_to_human_to_finalize` — computed correctly, not shown to the customer, matching the `off` default exactly as designed. | Thin data (n=1 live trigger), but the one observed case fired exactly as designed — worth more volume before a real frequency estimate, but zero evidence against the current design. Stays `off`; this is a UI/UX lever per §8A, not a safety gate, so a low-volume clean result is sufficient to leave as-is rather than urgent to re-run. | `dev/trigger_flag_runner.py`, `dev/trigger_flag_transcripts.txt`, `logs/agent.jsonl` (`upgrade_offer_computed`, non-pytest) |
+| `CANCEL_RETENTION_PROMPT` | Same run as above — 7 cancel-eligible conversations across `pre_pickup_free`/`pre_pickup_penalty`/`overdue_mid_rental` (in-rental) scenarios produced **12 live `retention_prompt_computed` events**: `would_offer=True` in 7/12 (all `pre_pickup_gt_48h`/`pre_pickup_le_48h` branches), `would_offer=False` in 5/12 (all `in_rental` branches — correctly withheld while early-return-vs-cancellation is still ambiguous, rather than adding a second decision on top of an unresolved one). `surfaced=False` on every event, matching the `off` default. | The pre-pickup trigger rate is high (7/7 pre-pickup cancel attempts would have offered retention) — consistent with the flag being a live UX lever whenever it's ever turned on, not evidence it should default on now. Correctly never fires mid-rental until intent is resolved, which is the one behavior that would have been a genuine bug if wrong (retention friction stacked on top of the early-return/cancel disambiguation from §3). Stays `off` per §8A's UI/UX-lever framing. | `dev/trigger_flag_runner.py`, `dev/trigger_flag_transcripts.txt`, `logs/agent.jsonl` (`retention_prompt_computed`, non-pytest) |
 
 ---
 

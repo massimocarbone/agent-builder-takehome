@@ -1,0 +1,283 @@
+
+
+########## SCENARIO: active_mid_rental | CONVO: happy_path_extend ##########
+
+--- turn 1 ---
+USER: hey, can I extend my rental a few days?
+AGENT: I can help you extend your rental! Please provide your reservation ID so I can look up your booking and confirm the current vehicle and return date. Once I have that, we’ll go over the new return time and quote you the total before anything is charged.
+
+--- turn 2 ---
+USER: AVS-90000001 / sarah.johnson@example.com... wait is that even the right email? let me check. yes sarah.johnson@example.com
+AGENT: Thanks for the details! I found your reservation for a Chevrolet Malibu (pickup and return at Los Angeles International Airport). Your current return date is August 9, 2026, at 4:53 PM.
+
+How many more days would you like to keep the car? Once I know the new return date and time, I’ll quote you the total for the extension before anything is charged.
+
+--- turn 3 ---
+USER: can I push the return to Aug 12th around 3pm?
+AGENT: You can extend your rental to August 12th at 3:00 PM. The total cost for the 3-day extension will be $150.73 USD. This total covers the extra days, taxes, and fees—no late or one-way charges.
+
+Do you agree to this amount? If yes, I’ll just need the email on file (sarah.johnson@example.com), plus the card’s CVV and billing ZIP to confirm and process the extension. Let me know when you’re ready!
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+
+--- turn 4 ---
+USER: actually wait, what's the grace period if I'm a little late returning it?
+AGENT: The grace period for returning your Avis rental is 30 minutes after your scheduled return time. If you return the car more than 30 minutes late, a late return fee of $29.00 will apply in addition to extra daily charges for the time kept over.
+
+If you already know you'll be late, extending your rental in advance (like we discussed) is usually cheaper than incurring late fees. Let me know if you’d like to proceed with the extension or if you have any other questions!
+
+--- turn 5 ---
+USER: ok that's fine, yes go ahead and extend it
+AGENT: Great! To process the extension, I’ll need:
+
+- The email on file (sarah.johnson@example.com)
+- The card’s CVV
+- The billing ZIP code
+
+Please provide those so I can confirm and finalize your extension to August 12th at 3:00 PM for $150.73 USD.
+
+
+########## SCENARIO: active_mid_rental | CONVO: read_only_question ##########
+
+--- turn 1 ---
+USER: what car am I driving and when is it due back? reservation AVS-90000001
+AGENT: You are driving a Chevrolet Malibu or a similar vehicle. Your rental is currently due back at Los Angeles International Airport on August 9, 2026, at 4:53 PM (local time). If you have any other questions or need to make changes, just let me know!
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+
+--- turn 2 ---
+USER: sarah.johnson@example.com
+AGENT: Thank you for providing an email. To protect your information, I can't verify your reservation or share any sensitive card details just based on an email. However, if you’d like to make a change (such as extending or cancelling), let me know what you’d like to do and I’ll guide you through the process. If you just need details about your car or return time, you've already got those!
+
+If you need something more specific or want to proceed with changes, please let me know!
+
+--- turn 3 ---
+USER: cool thanks, no changes needed right now
+AGENT: You’re welcome! If you have any questions or need help with your rental later on, just reach out. Have a great day and safe travels!
+
+
+########## SCENARIO: active_mid_rental_preferred | CONVO: preferred_upgrade_mention ##########
+
+--- turn 1 ---
+USER: hi I need to extend AVS-90000002, email marcus.lee@example.com
+AGENT: I have your reservation for a Toyota Highlander (or similar) at O'Hare International Airport, currently due back on August 10, 2026, at 6:53 PM.
+
+Please tell me the new date and time you’d like to return the car. I’ll then quote you the total for the extension before anything is charged.
+
+--- turn 2 ---
+USER: til Aug 13 5pm please
+AGENT: Extending your rental to August 13, 2026, at 5:00 PM will cost a total of $213.00 USD. This covers the additional 3 days, taxes, and fees.
+
+Would you like to proceed with this extension? If yes, I’ll need:
+- The email address on file (for verification)
+- The CVV from the card on file
+- The billing ZIP code
+
+Please provide these details to confirm the extension.
+
+--- turn 3 ---
+USER: yes confirm it
+AGENT: Great! To confirm and authorize the extension, I'll need a few details:
+
+- The CVV from the card on file (3 or 4 digits)
+- The billing ZIP code for the card
+
+You've already provided the email as marcus.lee@example.com. Once you give me the CVV and ZIP, I'll process the extension and provide your confirmation.
+
+
+########## SCENARIO: pre_pickup_free | CONVO: happy_path_cancel_free ##########
+
+--- turn 1 ---
+USER: I need to cancel my upcoming reservation AVS-90000003
+AGENT: Here’s the estimate for cancelling your upcoming reservation AVS-90000003 (Toyota Corolla, O'Hare International Airport, pickup August 11):
+
+- Estimated penalty: $0.00
+- Estimated refund: $116.97 (USD)
+
+This is an estimate based on standard policy. The final amounts are confirmed at cancellation. Please note, if your reservation was booked under a prepaid non-refundable rate, a refund may not be issued.
+
+Would you like to proceed with this cancellation? If yes, I'll just need the email address on file to finalize it.
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+
+--- turn 2 ---
+USER: priya.patel@example.com
+AGENT: Your reservation AVS-90000003 has been cancelled.
+
+- Confirmation number: CXL-LOCAL-0003
+- Actual penalty: $0.00
+- Actual refund: $116.97 (USD)
+
+Your refund will be issued to the original form of payment, typically within 5 to 10 business days.
+
+If you need anything else, just let me know!
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+
+--- turn 3 ---
+USER: yes please cancel it
+AGENT: Your reservation AVS-90000003 has already been cancelled. Here are the details:
+
+- Cancellation confirmation number: CXL-LOCAL-0003
+- No penalty was charged.
+- A refund of $116.97 has been issued and should appear on your original form of payment within 5 to 10 business days.
+
+If you have any other questions or need further help, feel free to ask!
+
+
+########## SCENARIO: pre_pickup_penalty | CONVO: happy_path_cancel_penalty ##########
+
+--- turn 1 ---
+USER: I need to cancel reservation AVS-90000004, my pickup is tomorrow morning basically
+AGENT: Here’s your cancellation estimate for reservation AVS-90000004 (Nissan Altima or similar, pickup at Los Angeles International Airport tomorrow):
+
+- Estimated penalty: $41.99 USD
+- Estimated refund: $83.98 USD
+- Prepaid amount: $125.97 USD
+
+These numbers are an estimate; the final amount is confirmed at cancellation. Some prepaid non-refundable rates do exist, but your reservation appears refundable based on what I see.
+
+Would you like to proceed with this cancellation and receive your refund minus the penalty? If yes, I’ll just need the email you used for the booking to finalize it.
+
+--- turn 2 ---
+USER: david.kim@example.com
+AGENT: Your reservation AVS-90000004 has been cancelled. Here are the final details:
+
+- Confirmation number: CXL-LOCAL-0004
+- Penalty charged: $41.99 USD
+- Refund to be issued: $83.98 USD (back to your original form of payment)
+- Refunds are typically processed within 5 to 10 business days.
+
+If you need a copy of these details by email or have any other requests, let me know.
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+
+--- turn 3 ---
+USER: will I get charged anything?
+AGENT: Yes, you will be charged a cancellation penalty of $41.99 USD. The rest of your prepaid amount ($83.98 USD) will be refunded to your original form of payment. 
+
+The penalty is the only charge applied for cancelling this reservation. If you need any more details or have questions about the timing or process, just ask!
+
+--- turn 4 ---
+USER: ok, yes cancel it, I understand
+AGENT: Your reservation AVS-90000004 has already been cancelled. The cancellation penalty of $41.99 USD will be charged, and the remainder ($83.98 USD) will be refunded to your card. Refunds usually appear within 5 to 10 business days.
+
+If you need any more help or a copy of the cancellation details, just let me know!
+
+
+########## SCENARIO: overdue_mid_rental | CONVO: cancel_ambiguous_disambiguation ##########
+
+--- turn 1 ---
+USER: I want to cancel AVS-90000005
+AGENT: You currently have the vehicle, so there are two options:
+
+1. If by "cancel" you mean you're simply done with the car and ready to return it, that's considered an early return. There's no fee, and your charges will be adjusted based on the actual rental time when you bring the car back to the branch counter—no action needed here.
+
+2. If you truly want to cancel the reservation, there's an estimated penalty of $38.99 and an estimated refund of $194.95. The final amount is confirmed at cancellation. Please note: cancelling does not end the physical rental, and the car must still be returned.
+
+Just to confirm, which would you like to do—end the rental early at the counter (no fee), or proceed with cancellation (penalty applies and car still must be returned)?
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+
+--- turn 2 ---
+USER: tomas.rivera@example.com
+AGENT: I need to know which option you want:
+
+1. End the rental early by returning the car at the counter (no fee, charges adjusted based on actual rental time)
+2. Proceed with cancellation (estimated penalty $38.99, estimated refund $194.95, and you still need to return the car)
+
+Please confirm your choice so I can continue.
+
+--- turn 3 ---
+USER: I want to cancel
+AGENT: Thank you for confirming. To proceed with the cancellation:
+
+- The estimated penalty is $38.99
+- The estimated refund is $194.95
+- You will still need to return the car to the branch
+
+These amounts are an estimate—final figures are confirmed at cancellation.
+
+Just to confirm: Cancel this reservation, penalty $38.99, refund $194.95, and you will return the car—yes or no?
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+
+
+########## SCENARIO: overdue_mid_rental | CONVO: cancel_ambiguous_early_return ##########
+
+--- turn 1 ---
+USER: hey I have reservation AVS-90000005 and I want to cancel it
+AGENT: You currently have the vehicle for reservation AVS-90000005. Just to clarify: do you want to completely cancel the reservation (which would mean a $38.99 penalty and a refund estimate of $194.95, but you must still return the car), or are you just done with the car and ready to return it early? 
+
+If you’re returning early, there’s no cancellation fee—it’s handled at the branch and you’ll only be charged for the time you used. Please let me know which one you’d like to do.
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+
+--- turn 2 ---
+USER: tomas.rivera@example.com
+AGENT: Thanks for providing your email! Before we move forward, could you please confirm whether you want to:
+
+1. Cancel the reservation (with a $38.99 penalty and a refund estimate of $194.95, car must still be returned), or
+2. Simply return the car early (no cancellation fee, and charges are based on actual rental time, handled at the counter)?
+
+Just let me know which option you’d like to proceed with. Once you confirm, I’ll take care of the next steps!
+
+--- turn 3 ---
+USER: I'm done with the car, just bringing it back today
+AGENT: No problem—nothing has been cancelled and there’s no fee for ending your rental early. Just return the vehicle to the branch when you’re ready. Your final charges will be based on the actual time you used the car, and everything will be handled at the counter.
+
+If you need anything else, just let me know! Safe travels.
+
+
+########## SCENARIO: pay_at_counter | CONVO: nothing_to_refund ##########
+
+--- turn 1 ---
+USER: can you cancel my reservation AVS-90000006? email robert.chen@example.com
+AGENT: Here’s what I can do for your reservation AVS-90000006 (Ford Explorer or similar, Los Angeles International Airport):
+
+The estimate for cancelling is:
+- Estimated penalty: $0.00
+- Estimated refund: $0.00 (no prepayment was made)
+
+This is an estimate—final numbers are confirmed at the point of cancellation. Just to confirm: would you like to proceed with cancelling this reservation now?
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+
+--- turn 2 ---
+USER: yes cancel it
+AGENT: Your reservation AVS-90000006 has been cancelled. Here are the details:
+
+- Confirmation number: CXL-LOCAL-0006
+- Actual penalty: $0.00
+- Actual refund: $0.00 (no prepayment was made)
+
+No charges were applied, and there’s nothing to refund. If you had paid, refunds typically appear on your card within 5 to 10 business days.
+
+Let me know if you need anything else!
+  [tool_item] ToolCallItem: ToolCallItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reservation 
+  [tool_item] ToolCallOutputItem: ToolCallOutputItem(agent=Agent(name='Avis Servicing Agent', handoff_description=None, tools=[FunctionTool(name='lookup_reservation', description="Look up an Avis reservation by ID (e.g. 'AVS-29471835').\n\nCall this whenever a customer references a reservation — for a change OR just to\nanswer a question about it. Everything this returns may be shared with the caller\nexcept `card_last_four`, which needs verification first.", params_json_schema={'properties': {'reservation_id': {'title': 'Reserv
+
+--- turn 3 ---
+USER: wait will I get a refund?
+AGENT: You will not receive a refund for this cancellation because there was no prepayment made on your reservation AVS-90000006—no charges were applied to your card. So, there is nothing to refund.
+
+If you have any more questions, just ask!
+
+
+########## SCENARIO: inactive_cancelled | CONVO: already_cancelled_409 ##########
+
+--- turn 1 ---
+USER: I need to cancel AVS-90000007, email is whatever is on file, let's say a placeholder@example.com
+AGENT: This reservation (AVS-90000007) is already marked as cancelled, so there’s nothing left to process. No further action is needed.
+
+If you have another reservation or need help with something else, just let me know!
+
+--- turn 2 ---
+USER: that doesn't sound right, I never cancelled this, can you check again?
+AGENT: According to the system, reservation AVS-90000007 is already cancelled and there are no further actions I can take on it through this service. I don’t have the ability to reverse or investigate cancellations, but I understand this is concerning if you didn’t authorize it.
+
+Would you like me to connect you with an Avis representative who can review your account activity and clarify what happened? If you have another reservation, I can help with that directly as well. Let me know how you'd like to proceed.

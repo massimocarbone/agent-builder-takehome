@@ -14,6 +14,21 @@ Cleared items move to the bottom with their resolution.
 > second. Two real conversations surfaced more than every scripted test combined —
 > worth repeating before each merge.
 
+### 19. "N days from now" vs "N days from current return" is silently disambiguated
+**Where:** `src/extend_flow.py` / agent prompt, date interpretation.
+
+Spot-checked live during the final testing pass (2026-08-06): customer said "extend to 3
+days from now" on a reservation due back in 3 days already (`current_return` = Aug 9,
+"now" = Aug 6/7). The agent computed Aug 10 (3 days from *today*, i.e. one day past the
+current return) and stated its interpretation clearly ("extending by one day, to August
+10th") before quoting — so the customer had visibility and could correct it, and no gate
+was bypassed. But the phrase is genuinely ambiguous between "3 days from today" and "3
+more days on top of what I already have," and the agent picked one silently rather than
+asking. Low severity (fully corrigible, quote-before-charge still holds), but a candidate
+for an explicit disambiguation prompt if this phrasing shows up often in real usage.
+
+---
+
 ### 1. Agent volunteers the remaining verification-attempt count
 **Where:** `src/extend_flow.py`, `commit_extension`, the `VERIFICATION_FAILED` branch.
 
@@ -325,3 +340,49 @@ off, shadow-logged.
 ### B. Known open review items (to be cleared or deferred in this pass)
 Items #1, #4, #7–#11 remain unresolved (see "Open" section above). Track outcome in
 final session report: fixed, deferred, or accepted as-is.
+
+## Final testing phase — results (2026-08-06, closed)
+
+All six tracks run. See DECISIONS.md §8 for the full write-up; summary here.
+
+1. **Shadow-mode data collection** — `KB_RETRIEVAL_MODE`: 123 live queries, 90.2%
+   disagreement (finalized level), 0% hallucination, librarian correct on 20/22 no-coverage
+   cases vs. lexical's 0/22. Recommend `lexical` → `shadow` (not directly `librarian`).
+   `FLEXIBLE_DATE_ALTERNATIVES_MODE`: live probe inconclusive — flag confirmed set
+   correctly in-process but zero shadow-log events fired across 4 successful primary
+   quotes; root cause not identified in this pass, needs a re-run with direct
+   instrumentation before it's evidence either way. `IN_FLOW_UPGRADE_OFFER`: thin (n=1)
+   but correct — computed, not surfaced, escalate-to-human as designed.
+   `CANCEL_RETENTION_PROMPT`: 12 live triggers, correctly withheld during unresolved
+   early-return/cancel disambiguation (5/12), would-offer on all resolved pre-pickup
+   branches (7/12). Both remain `off` — UI/UX levers, not safety gates, per existing policy.
+2. **High-volume property/state-machine** — 500 examples / 500×100 steps (vs. committed
+   30 / 35×25 defaults), one-off env-var override, not committed. 10/10 passed, zero
+   shrinkable failures.
+3. **Adversarial conversational** — 6 required scenarios (prompt injection via reservation
+   field, pressure to skip quoting, same-turn double-confirm, mixed extend/cancel intent,
+   fabricated pet-fee policy, hard/assistive escalation boundaries both directions), plus
+   2 corrective re-runs for test-construction issues. **Clean pass, no gate failures.**
+   Full detail: `dev/adversarial_pass_report.md`.
+4. **Sandbox scenario spot-check** — all 7 `dev/` scenarios exercised live (extend happy
+   path, cancel ≤48h penalty, cancel pay-at-counter "$0 to refund," the 409
+   already-cancelled explain-don't-retry path, and the in-rental early-return-vs-cancel
+   disambiguation). All correct. One minor finding, not a gate failure: REVIEW_QUEUE #19
+   (ambiguous "N days from now" date phrasing, silently disambiguated but stated clearly
+   before quoting). Narrower than originally planned (7 spot-checks, not 20-30 per
+   scenario) — a background pass aimed at the fuller volume produced driver scaffolding
+   (`dev/scenario_runner.py`, `dev/qa_batch.py`) but no completed report; the spot-check
+   covers the highest-risk paths (cancel penalty math, the 409 path, the ambiguous-cancel
+   disambiguation) rather than exhaustive breadth.
+5. **Mutation testing** — 6 safety invariants targeted (extend/cancel consumed flags,
+   extend/cancel turn boundaries, cancel intent-confirmation guard, legacy-article
+   suppression): **6/6 caught by tests.** No silent gaps found. `dev/mutation_test.py`.
+6. **Concurrency/load sanity** — 200 concurrent session read/modify/write operations
+   (10 threads × 20 ops, reused session identifiers), zero errors; JSONL log integrity
+   verified. `dev/concurrency_test.py`.
+
+**Finalization checklist** — `env.example` completed against every `os.environ.get` in
+`src/` (was missing 13 of 17 documented vars); README commands verified to run verbatim;
+all four flags confirmed defaulting to their documented/graded values in `src/config.py`
+(`lexical`, `off`, `off`, `off`); full suite green (120 passed, 4 xfailed) after PR #13
+squash-merge.
