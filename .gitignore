@@ -11,6 +11,7 @@ venv/
 # Runtime logs
 logs/
 artifacts/test-runs/
+dist/
 
 # OS / editor
 .DS_Store

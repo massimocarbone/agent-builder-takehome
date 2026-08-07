@@ -35,8 +35,8 @@ A starting point for the Avis rental-servicing agent take-home. **Start with [`B
    ```bash
    cp env.example .env
    ```
-   `AVIS_API_URL` is already filled in. Add your **`AVIS_API_KEY`** — grab it from this 1Password
-   link: https://share.1password.com/s#yaM3mKXX9P8_BHxWxpaSzhqqe4YIq4p6AaUafkLJ9vY — plus your own
+   `AVIS_API_URL` is already filled in. Obtain your **`AVIS_API_KEY`** through the assignment's
+   private credential channel, then add it locally alongside your own
    LLM key: we **highly recommend the OpenAI Agents SDK** (set `OPENAI_API_KEY`) — the scaffold
    uses it — but you may use **Google's ADK** instead (set `GOOGLE_API_KEY` and adapt the scaffold).
 4. **Verify the API connection** (looks up a sample reservation):

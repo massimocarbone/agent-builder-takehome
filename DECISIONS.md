@@ -1174,6 +1174,53 @@ negative one — it means the deterministic money/session layer held up under su
 more randomized exploration than CI runs by default, which is the best evidence available
 short of finding an actual bug.
 
+### B.2 Last-read review: material risks intentionally left open
+
+After the final independent code review, several additional flaws were reproduced. They
+were found too late in the take-home timebox to change the money/session state machine
+responsibly, so they are **not represented as solved**. This is important context for a
+presentation: the prototype demonstrates useful structural safeguards, but it is not a
+claim of production readiness.
+
+- **Parallel confirmation race.** The agent framework can execute multiple function calls
+  concurrently. Two confirmation calls can both observe an unconsumed quote/estimate before
+  either marks it consumed; because each logical request gets a new idempotency key, this
+  can cross the write boundary twice. The existing state-machine and dev concurrency check
+  are sequential / do not exercise the real SQLite or JSONL boundaries.
+- **Handoff and failed-turn atomicity.** A hard handoff can be downgraded if the model later
+  invokes the assistive handoff path. Separately, if a model turn stages a quote and then
+  fails before speaking the result, the next numeric turn can satisfy the current
+  quote-before-write gate even though the customer never saw the price. The CLI's generic
+  exception path announces a handoff without setting terminal handoff state.
+- **Cancellation outcome/state gaps.** Cancel lacks Extend's incomplete-success guard: a
+  success response without a confirmation/details can be reported as complete and consume
+  the staged authority. Successful mock writes also do not update local reservation state,
+  which permits contradictory follow-up operations in one conversation. Cancellation
+  estimates have no TTL/revalidation and can cross the 48-hour or pickup-time boundary.
+- **Consent and sensitive free text.** A later turn proves a reply occurred, not that the
+  reply was affirmative; a negative answer can still be accepted if the model calls a write
+  tool. A bare CVV/ZIP reply can survive transcript redaction. These are known residual
+  risks, not coverage claims.
+
+The safe next engineering step is to add focused regression tests and then make small,
+reviewable fixes for each invariant; it is not to silently broaden the current safety claim
+after the submission deadline.
+
+### B.3 Submission hygiene
+
+The brief requires excluding virtual environments, `__pycache__`, and local secrets. The
+tracked `scripts/package_submission.py` creates the archive from committed files only and
+rejects a dirty tracked worktree. After the final README/docs commit, run:
+
+```bash
+python scripts/package_submission.py
+```
+
+Upload the resulting `dist/avis-servicing-agent-submission.zip`. Do not use a recursive
+Finder/desktop zip of the working directory: it can include ignored `.env`, local logs, and
+virtual environments. Credentials and password-manager share links must be delivered
+outside Git and outside the archive.
+
 ### C. Decision record
 
 After the testing pass, update this section with measurements and per-flag decisions:
