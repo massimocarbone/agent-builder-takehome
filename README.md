@@ -136,13 +136,83 @@ cancellation disambiguation, and hard handoffs. Both use bounded local settings 
 scripted transports, so they do not call the live Avis API or an LLM. To reproduce an
 exact stateful run, pass a seed such as `--hypothesis-seed=20260806`.
 
-## Then build
+## Design & Scope
 
-Head to [`BRIEF.md`](BRIEF.md). Build the RAG foundation and escalation logic first, then
-choose which workflow(s) to support and why. The design is yours — `agent.py` and
-`avis_client.py` just prove the wiring works; replace and extend them however you like.
+**Workflows chosen: Extend and Cancel.** Modify was cut — it doesn't route money through
+the system (customers call the branch to change a non-rate-affecting detail), and adding
+it would duplicate the reservation-lookup and escalation scaffolding without testing those
+mechanisms further. See [DECISIONS.md](DECISIONS.md) §1 for the full reasoning.
 
-When you submit, please update this README to cover: your design decisions, which
-workflow(s) you chose and why, what you cut, how to run your code, and where your logs are.
-Submit as a **zip archive of this repo** (uploaded, not a GitHub link) — exclude `.venv/`,
-`__pycache__/`, and any local secrets.
+**Architecture: three deterministic layers wrapping an LLM.**
+
+1. **KB retrieval** (deterministic, testable without a model). Lexical scoring with
+   authority-aware ranking. The corpus contains a legacy article with a stale grace period;
+   deterministic scoring catches that in regression tests. See §2 for the homonym problem
+   the lexical boundary leaves unsolved, and `KB_RETRIEVAL_MODE` (above) for the librarian
+   mitigation.
+2. **Money flow** (plain Python). Extend and Cancel both estimate a price, gate a
+   confirmation on it, write if approved, then compare actual vs. estimated (the variance
+   check). The agent proposes actions; deterministic code enforces them. Write idempotency
+   is guaranteed by an Avis API idempotency key stable across retries, plus a
+   once-per-request `consumed` flag. See §3 for the full confirmation gate semantics and
+   the early-return-vs-cancel disambiguation that only lives in data, not in the agent's
+   decision logic.
+3. **Escalation** (structured state, enforced at tool entry). A hard handoff (`handed_off=True`)
+   blocks all action tools. Everything the customer said, every quote, every verification
+   attempt travels with the escalation, so the human never has to re-interview. §3 documents
+   the assistive vs. hard distinction.
+
+**Rules that safety depends on.**
+
+- **Confirmation gates.** A write refuses unless a quote the customer actually *saw* lives
+  in the session state. The model cannot quote and confirm in the same turn — the gate
+  compares conversation turns, not wall time. Single-use (a retried tool call or replayed
+  turn cannot charge twice).
+- **Authority-aware suppression.** Legacy articles are dropped when a higher-authority
+  version exists in the same category, computed from the corpus unconditionally, not from
+  what matched this query (the fix for the "precise retriever" problem).
+- **Escalation finality.** A hard handoff sets a terminal flag checked at every tool entry.
+  The model going quiet is enforced in code, not requested in the prompt.
+- **Secrets redaction.** Email, card, CVV, ZIP: redacted at log time, never in plaintext
+  to a human, never visible in test artifacts (which are sandboxed and git-ignored). Best
+  effort — free text can always hide a number somewhere this misses.
+
+See [DECISIONS.md](DECISIONS.md) in full for design trade-offs, cross-cutting rules (§3),
+feature-flag guidance (§4), the API surface and its gaps (§5), and the pre-submission testing
+phase results (§8).
+
+## Logs & Observability
+
+Decision and API events log to `logs/agent.jsonl` and `logs/api.jsonl` respectively.
+Every event carries a conversation ID (stable across a customer interaction), operation ID
+(spans retries of one logical call), and run ID (from the test harness). Structured fields
+allow aggregating by reservation, error code, escalation reason, policy branch, and KB
+retrieval source/accuracy.
+
+**From a live run:** `python src/agent.py` writes to these logs as the customer talks.
+
+**From tests:** The wrapper script (see "Isolated local test artifacts" above) isolates each
+run's artifacts. The `summary.json` in each run's directory includes a full event dump, a
+pass/fail verdict, and a scan for accidentally logged secrets (returns nonzero if any found).
+
+Logs are the source of truth for what the agent decided and why. The transcript is included
+in escalation payloads to the human but never surfaced to the customer (answers come through
+the agent's own text, not logged reasons).
+
+## Running the agent
+
+```bash
+python src/agent.py
+```
+
+Requires `.env` configured (see Setup above), with at minimum `AVIS_API_KEY`,
+`OPENAI_API_KEY` (or `GOOGLE_API_KEY`), and optional feature-flag toggles (see
+[DECISIONS.md](DECISIONS.md) §4). The agent runs one conversation per invocation; see
+`src/agent.py` for the Runner integration if you want to host it as a service.
+
+## Then build (if extending)
+
+Head to [`BRIEF.md`](BRIEF.md) if this is your starting point. This submission is complete
+and tested (120 passed, 4 deliberate xfail — see Tests above). The design is stable; extend
+it by adding workflows, improving KB retrieval, or adding new gates. `src/agent.py` and
+`src/avis_client.py` are the integration points. Replace and extend as needed.
