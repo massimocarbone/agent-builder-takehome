@@ -1,49 +1,37 @@
 # Avis Agent — Take-Home
 
-A starting point for the Avis rental-servicing agent take-home. **Start with [`BRIEF.md`](BRIEF.md)** — it describes the task. This repo is a thin scaffold to save you setup time; it is **not** a solution.
+This is a working prototype for servicing an existing Avis rental. It supports **Extend**
+and **Cancel**, with deterministic API integration, pricing/policy logic, confirmation
+gates, and structured escalation around an LLM conversation layer.
 
-## What's here
-
-```
-.
-├── BRIEF.md                          # the task — read this first
-├── docs/
-│   └── api-reference.md              # the Avis API your agent calls
-├── data/
-│   └── knowledge-base/articles.json  # Avis help-center articles (for RAG)
-├── src/
-│   ├── agent.py                      # a runnable hello-world agent (NOT a solution)
-│   └── avis_client.py                # one worked example call to the Avis API
-├── env.example
-└── requirements.txt
-```
+Start with [`BRIEF.md`](BRIEF.md) for the evaluation goals, then see
+[`DECISIONS.md`](DECISIONS.md) for scope, rationale, known limits, and testing evidence.
 
 ## Setup
 
-1. **Python 3.10+ required** (the OpenAI Agents SDK needs it). Check first — on macOS the
-   system `python3` is often 3.9, which won't work:
+1. **Python 3.10+ required** (the OpenAI Agents SDK needs it):
    ```bash
-   python3 --version            # need 3.10 or higher
-   # if it's < 3.10, install a newer one (e.g. `brew install python@3.12`) and use that:
-   python3 -m venv .venv && source .venv/bin/activate
+   python3 --version
+   python3 -m venv .venv
+   source .venv/bin/activate
    ```
 2. **Install dependencies:**
    ```bash
-   pip install -r requirements.txt
+   python -m pip install -r requirements.txt
    ```
 3. **Configure your environment:**
    ```bash
    cp env.example .env
    ```
    `AVIS_API_URL` is already filled in. Obtain your **`AVIS_API_KEY`** through the assignment's
-   private credential channel, then add it locally alongside your own
-   LLM key: we **highly recommend the OpenAI Agents SDK** (set `OPENAI_API_KEY`) — the scaffold
-   uses it — but you may use **Google's ADK** instead (set `GOOGLE_API_KEY` and adapt the scaffold).
+   private credential channel, then add it locally alongside your own **`OPENAI_API_KEY`**.
+   This submitted implementation uses the OpenAI Agents SDK; Google ADK would require a
+   separate adaptation.
 4. **Verify the API connection** (looks up a sample reservation):
    ```bash
    python src/avis_client.py
    ```
-5. **Run the starter agent:**
+5. **Run the agent:**
    ```bash
    python src/agent.py
    ```
@@ -56,12 +44,11 @@ Run the complete test suite with:
 python -m pytest
 ```
 
-Four tests report as `XFAIL`. Each is a safeguard we **decided not to build**, not one
-that's merely outstanding — the reason is attached to the test and argued in
-[`DECISIONS.md`](DECISIONS.md) (§2 retrieval limits, §3 "Gaps left open on purpose").
-Strict mode means implementing one turns its unexpected pass into a failing result, so a
-gap can't quietly half-close; the marker comes off and the test graduates into the normal
-suite.
+Four tests report as `XFAIL`. They document known residual risks rather than passing
+coverage; their reasons are attached to the tests and discussed in
+[`DECISIONS.md`](DECISIONS.md). The final independent review also found additional risks
+recorded in §8B.2. Strict mode means an unexpected pass fails until the marker is removed
+and the test graduates into the normal suite.
 
 `xfail` also swallows *errors*, so a test that crashes before reaching its assertion looks
 identical to a documented gap. Before believing one, read the real failure:
@@ -110,16 +97,16 @@ python scripts/run_tests.py tests/test_client.py -k retry
 Each invocation creates `artifacts/test-runs/<run-id>/` containing `metadata.json`,
 `summary.json`, `console.log`, `pytest.log`, `junit.xml`, `agent.jsonl`, and `api.jsonl`.
 The directory is git-ignored and one run never appends to another. The wrapper supplies
-fake Avis credentials only to the test subprocess (all HTTP is scripted); production
+inert default Avis settings for the test subprocess and all HTTP is scripted; production
 imports still fail fast when real configuration is absent.
 
 Decision and API JSONL events carry available `run_id`, `test_id`, `conversation_id`,
-`turn_id`, and `operation_id` fields. One operation ID spans all retries of a request,
-while write idempotency keys keep their existing retry-safety behavior. Known email,
-card, CVV, billing-ZIP, authorization, and API-key values are recursively redacted. The
-run summary also scans the structured JSONL artifacts for obvious raw email/card/CVV
-patterns and returns a non-zero status if it finds one. Treat this as a guardrail, not a
-replacement for access control or a dedicated secret scanner.
+`turn_id`, and `operation_id` fields. One operation ID spans all retries of a request.
+Structured secret fields and obvious labelled/card-like free-text patterns are redacted;
+the run summary scans structured artifacts for obvious email/card/CVV patterns and returns
+a non-zero status if it finds one. Bare free-text CVVs and ZIPs remain a documented
+limitation (§8B.2), so this is a guardrail—not a replacement for access control or a
+dedicated secret scanner.
 
 ### Generative safety tests
 
@@ -138,10 +125,12 @@ exact stateful run, pass a seed such as `--hypothesis-seed=20260806`.
 
 ## Design & Scope
 
-**Workflows chosen: Extend and Cancel.** Modify was cut — it doesn't route money through
-the system (customers call the branch to change a non-rate-affecting detail), and adding
-it would duplicate the reservation-lookup and escalation scaffolding without testing those
-mechanisms further. See [DECISIONS.md](DECISIONS.md) §1 for the full reasoning.
+**Supported: Extend and Cancel.** **Cut: Modify and Upgrade.** We prioritized complete,
+testable coverage of two distinct risk classes—an extension that can charge and an
+irreversible cancellation—over a rushed third workflow. Modify remains a natural future
+addition because it can reuse reservation lookup and escalation scaffolding, but it also
+requires payment verification and can incur one-way fees. See [DECISIONS.md](DECISIONS.md)
+§1 for the full rationale.
 
 **Architecture: three deterministic layers wrapping an LLM.**
 
@@ -150,32 +139,27 @@ mechanisms further. See [DECISIONS.md](DECISIONS.md) §1 for the full reasoning.
    deterministic scoring catches that in regression tests. See §2 for the homonym problem
    the lexical boundary leaves unsolved, and `KB_RETRIEVAL_MODE` (above) for the librarian
    mitigation.
-2. **Money flow** (plain Python). Extend and Cancel both estimate a price, gate a
-   confirmation on it, write if approved, then compare actual vs. estimated (the variance
-   check). The agent proposes actions; deterministic code enforces them. Write idempotency
-   is guaranteed by an Avis API idempotency key stable across retries, plus a
-   once-per-request `consumed` flag. See §3 for the full confirmation gate semantics and
-   the early-return-vs-cancel disambiguation that only lives in data, not in the agent's
-   decision logic.
-3. **Escalation** (structured state, enforced at tool entry). A hard handoff (`handed_off=True`)
-   blocks all action tools. Everything the customer said, every quote, every verification
-   attempt travels with the escalation, so the human never has to re-interview. §3 documents
-   the assistive vs. hard distinction.
+2. **Money flow** (plain Python). Extend and Cancel stage a price or estimate, require a
+   later customer turn before the write, and reconcile the actual result afterward. The
+   agent proposes actions; deterministic code enforces the normal flow. The residual
+   concurrency, consent, and stale-state limits are documented in §8B.2.
+3. **Escalation** (structured state). Normal hard-handoff paths set `handed_off=True` and
+   block reservation-scoped tools. Handoff context includes the interaction needed for a
+   human to continue; the final review records a remaining downgrade edge case in §8B.2.
 
 **Rules that safety depends on.**
 
-- **Confirmation gates.** A write refuses unless a quote the customer actually *saw* lives
-  in the session state. The model cannot quote and confirm in the same turn — the gate
-  compares conversation turns, not wall time. Single-use (a retried tool call or replayed
-  turn cannot charge twice).
+- **Confirmation gates.** A write requires a staged price/estimate from an earlier turn;
+  the model cannot quote and confirm in the same turn. This is a meaningful deterministic
+  control, not proof of affirmative consent or concurrency safety—see §8B.2.
 - **Authority-aware suppression.** Legacy articles are dropped when a higher-authority
   version exists in the same category, computed from the corpus unconditionally, not from
   what matched this query (the fix for the "precise retriever" problem).
-- **Escalation finality.** A hard handoff sets a terminal flag checked at every tool entry.
-  The model going quiet is enforced in code, not requested in the prompt.
-- **Secrets redaction.** Email, card, CVV, ZIP: redacted at log time, never in plaintext
-  to a human, never visible in test artifacts (which are sandboxed and git-ignored). Best
-  effort — free text can always hide a number somewhere this misses.
+- **Escalation finality.** A hard handoff is enforced on normal action-tool paths; the
+  remaining downgrade edge case is documented in §8B.2.
+- **Secrets redaction.** Structured and labelled card/CVV fields are redacted in logs;
+  free-text redaction is best effort. A bare CVV or ZIP can survive the transcript path,
+  so do not treat local artifacts or handoffs as a compliant secret store (§8B.2).
 
 See [DECISIONS.md](DECISIONS.md) in full for design trade-offs, cross-cutting rules (§3),
 feature-flag guidance (§4), the API surface and its gaps (§5), and the pre-submission testing
@@ -184,16 +168,16 @@ phase results (§8).
 ## Logs & Observability
 
 Decision and API events log to `logs/agent.jsonl` and `logs/api.jsonl` respectively.
-Every event carries a conversation ID (stable across a customer interaction), operation ID
-(spans retries of one logical call), and run ID (from the test harness). Structured fields
-allow aggregating by reservation, error code, escalation reason, policy branch, and KB
-retrieval source/accuracy.
+Events carry the correlation IDs applicable to their lifecycle: conversation/turn IDs for
+agent work, operation IDs for API calls, and run/test IDs in the test harness. Structured
+fields allow aggregating by reservation, error code, escalation reason, policy branch, and
+KB retrieval source/accuracy.
 
 **From a live run:** `python src/agent.py` writes to these logs as the customer talks.
 
 **From tests:** The wrapper script (see "Isolated local test artifacts" above) isolates each
-run's artifacts. The `summary.json` in each run's directory includes a full event dump, a
-pass/fail verdict, and a scan for accidentally logged secrets (returns nonzero if any found).
+run's artifacts. `summary.json` records run metadata, pytest/final exit status, duration,
+and the artifact-secret scan; the separate JSONL files hold the events.
 
 Logs are the source of truth for what the agent decided and why. The transcript is included
 in escalation payloads to the human but never surfaced to the customer (answers come through
@@ -205,14 +189,26 @@ the agent's own text, not logged reasons).
 python src/agent.py
 ```
 
-Requires `.env` configured (see Setup above), with at minimum `AVIS_API_KEY`,
-`OPENAI_API_KEY` (or `GOOGLE_API_KEY`), and optional feature-flag toggles (see
-[DECISIONS.md](DECISIONS.md) §4). The agent runs one conversation per invocation; see
-`src/agent.py` for the Runner integration if you want to host it as a service.
+Requires `.env` configured (see Setup above), with at minimum `AVIS_API_KEY` and
+`OPENAI_API_KEY`; optional feature flags are in [DECISIONS.md](DECISIONS.md) §4. The agent
+runs one conversation per invocation; see `src/agent.py` for the Runner integration if you
+want to host it as a service.
 
-## Then build (if extending)
+## Create the submission archive
 
-Head to [`BRIEF.md`](BRIEF.md) if this is your starting point. This submission is complete
-and tested (120 passed, 4 deliberate xfail — see Tests above). The design is stable; extend
-it by adding workflows, improving KB retrieval, or adding new gates. `src/agent.py` and
-`src/avis_client.py` are the integration points. Replace and extend as needed.
+After committing final tracked documentation changes, run:
+
+```bash
+python scripts/package_submission.py
+```
+
+Upload `dist/avis-servicing-agent-submission.zip`. The script archives committed tracked
+files only and refuses a dirty tracked worktree, which excludes local `.env`, `.venv`,
+`__pycache__`, and logs. Do not create a recursive Finder/desktop zip of the working
+directory.
+
+## Extending after submission
+
+This prototype is complete for the chosen scope and tested with `120 passed, 4 documented
+XFAILs`. It also has explicitly recorded residual risks; see [DECISIONS.md](DECISIONS.md)
+§8B.2 before expanding the workflows, retrieval, or money-moving gates.
